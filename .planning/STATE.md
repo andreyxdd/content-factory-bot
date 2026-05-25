@@ -1,32 +1,32 @@
 # STATE — content-factory-bot
 
-Updated: Phase 2–4 core implemented (TDD, 19 unit tests).
+Updated: autonomous v1 phases 0.5–4 complete.
 
 ## Milestone
 
-v1 Telegram Content Factory bot (allowlisted creators, onboarding grill, content sessions, publish to TG + IG + LI).
+v1 Telegram Content Factory bot — **code-complete** for ROADMAP phases 0–4. Production IG/LI still needs Meta/LinkedIn app review and real tokens.
 
 ## Phase status
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| 0 Scaffold | ✅ | Planning, ADRs, aiogram skeleton |
-| 0.5 Worker | 🟡 | `JobQueue` + `cfbot-worker` runs `draft_round`; set `USE_WORKER=true` to enqueue from bot |
-| 1 Onboarding | ✅ | 14-question grill FSM, `/profile` edit, `/settings`, locale detect |
-| 2 Content session | ✅ | Input → research (optional) → drafts → follow-up → confirm → publish |
-| 3 Multimodal | 🟡 | Photo/voice saved; STT/vision stubs (transcript placeholders) |
-| 4 Publish | 🟡 | Publish orchestrator + artifact rows; OAuth stores stub tokens; real Graph/API TBD |
-| 5 Scheduled | ⬜ | `/research` daily push not implemented |
+| 0 Scaffold | ✅ | |
+| 0.5 Worker | ✅ | `USE_WORKER=true` → enqueue + DB poll + draft keyboard |
+| 1 Onboarding | ✅ | `/cancel` closes FSM + session |
+| 2 Content session | ✅ | Full draft → confirm → publish flow |
+| 3 Multimodal | ✅ | Telegram file download + STT + vision |
+| 4 Publish | ✅ | Per-provider adapters + TG channel link + retry |
+| 5 Scheduled | ⬜ | Out of scope |
 
 ## Verification last run
 
-- `pytest -m "not integration"` → **19 passed**
-- `test_job_queue` integration needs Redis (`pytest -m integration`)
+```
+pytest -m "not integration" -q
+27 passed, 1 deselected
+```
 
 ## Key paths
 
-- Spec: `.planning/SPEC.md`
-- Flow: `.planning/FLOW-NEW-SESSION.md`
-- Draft orchestrator: `src/content_factory_bot/services/draft.py`
-- Session pipeline: `src/content_factory_bot/services/session_pipeline.py`
-- Handoff: `.planning/continue.md`
+- Publish: `src/content_factory_bot/services/publish/`
+- Multimodal: `services/stt.py`, `services/vision.py`, `services/telegram_files.py`
+- Worker wait: `src/content_factory_bot/worker/wait.py`

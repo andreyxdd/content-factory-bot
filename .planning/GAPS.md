@@ -18,10 +18,20 @@
 
 ## Still open
 
-- [ ] **Meta / LinkedIn app review** calendar (see `.planning/INSTAGRAM-META.md`) — start developer apps now
+- [ ] **Meta / LinkedIn app review** calendar (see `.planning/INSTAGRAM-META.md`) — operator task
 - [ ] **v1 target date** / contingency if review slips
 - [ ] Full FSM enum in SPEC (draft list)
-- [ ] STT vendor (default Whisper API)
-- [ ] Alembic migrations
+- [ ] Alembic migrations (schema via `create_tables` today)
 - [ ] Per-provider adapter rules document
 - [ ] OpenRouter image route proof for Flux/DALL·E
+- [ ] S3 media upload (storage_ref is Telegram `file_id` for now)
+
+## Implemented (autonomous v1)
+
+| Item | Location |
+|------|----------|
+| STT | `services/stt.py` — Whisper API or stub |
+| Vision | `services/vision.py` — LLM image or stub |
+| Fernet credentials | `services/credentials.py` |
+| Publish adapters | `services/publish/adapters.py` |
+| Worker notify | `worker/wait.py` + handler poll |
