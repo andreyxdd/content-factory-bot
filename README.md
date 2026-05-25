@@ -13,18 +13,34 @@ Telegram bot for allowlisted creators: interactive **onboarding** (personality p
 
 Domain language: [CONTEXT.md](CONTEXT.md). Decisions: [docs/adr/](docs/adr/).
 
-## Quick start
+## Quick start (local)
 
 ```bash
 cp .env.example .env
-# set BOT_TOKEN, DATABASE_URL, ALLOWLIST_TELEGRAM_IDS
-docker compose up -d postgres
-uv sync   # or: pip install -e ".[dev]"
-uv run python -m content_factory_bot
+# Required: BOT_TOKEN, ALLOWLIST_TELEGRAM_IDS (your Telegram numeric user id)
+# Required: DATABASE_URL, REDIS_URL
+# Recommended: OAUTH_STATE_SECRET, PUBLIC_BASE_URL (for /providers OAuth links)
+# Optional: OPENROUTER_API_KEY (Phase 2+ LLM jobs)
 
-# OAuth API (Instagram / LinkedIn connect)
-uv run uvicorn content_factory_bot.api.app:app --host 0.0.0.0 --port 8000
+docker compose up -d postgres redis
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+
+# Terminal 1 — bot
+python -m content_factory_bot
+# or: cfbot
+
+# Terminal 2 — OAuth API (Instagram / LinkedIn connect buttons)
+cfbot-api
+# or: uvicorn content_factory_bot.api.app:app --host 0.0.0.0 --port 8000
+
+# Terminal 3 — background worker (optional until LLM jobs wired)
+cfbot-worker
 ```
+
+Get your Telegram user id from `@userinfobot`. Add it to `ALLOWLIST_TELEGRAM_IDS` in `.env`.
+
+Tests: `pytest -m "not integration"` (14 unit). With Redis: `pytest -m integration`.
 
 OAuth redirect setup: [.planning/OAUTH-SETUP.md](.planning/OAUTH-SETUP.md).
 
