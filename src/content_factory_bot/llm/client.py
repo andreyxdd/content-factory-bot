@@ -51,7 +51,7 @@ class LLMClient:
 
     async def chat(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         *,
         response_format: dict[str, Any] | None = None,
     ) -> str:
