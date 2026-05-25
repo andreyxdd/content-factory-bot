@@ -22,7 +22,9 @@ v1 Telegram Content Factory bot — **code-complete** for ROADMAP phases 0–4. 
 
 ```
 pytest -m "not integration" -q
-27 passed, 1 deselected
+37 passed, 2 deselected
+pytest tests/test_schema.py -m integration -q
+1 passed (requires Postgres on :5433 or TEST_DATABASE_URL)
 ```
 
 ## Key paths

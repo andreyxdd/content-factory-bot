@@ -13,6 +13,7 @@ Replace boot-time `create_tables()` with versioned Alembic migrations; document 
 | 3 | Boot: `ensure_schema()` + `AUTO_CREATE_TABLES` (dev only) | done |
 | 4 | Deploy: migrate before `systemctl restart` | done |
 | 5 | `GAPS.md`, `continue.md`, ADR-0012 | done |
+| 6 | TDD pins in `tests/test_schema.py` + `VERIFICATION.md` | done |
 
 ## Decisions
 
@@ -23,10 +24,15 @@ Replace boot-time `create_tables()` with versioned Alembic migrations; document 
 
 ## Verification
 
+See [VERIFICATION.md](./VERIFICATION.md). Full gate:
+
 ```bash
-docker compose up -d postgres
-cfbot-migrate   # or: .venv/bin/alembic upgrade head
+docker run -d --name cfbot-test-pg -e POSTGRES_USER=cfbot -e POSTGRES_PASSWORD=cfbot \
+  -e POSTGRES_DB=content_factory_test -p 5433:5432 postgres:16-alpine
+pytest tests/test_schema.py -m "not integration" -q
+pytest tests/test_schema.py -m integration -q
 pytest -m "not integration" -q
+bash -n deploy/scripts/backup-db.sh
 ```
 
 ## Non-goals
