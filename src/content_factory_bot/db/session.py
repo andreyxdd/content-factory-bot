@@ -27,6 +27,12 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
     return _session_factory
 
 
+def get_engine() -> AsyncEngine:
+    if _engine is None:
+        raise RuntimeError("Database not initialized; call init_db() first")
+    return _engine
+
+
 @asynccontextmanager
 async def session_scope() -> AsyncIterator[AsyncSession]:
     factory = get_session_factory()

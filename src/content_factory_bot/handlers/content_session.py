@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 
 from content_factory_bot.config import get_settings
 from content_factory_bot.db.models import Creator
-from content_factory_bot.db.session import session_scope
+from content_factory_bot.db.session import get_engine, session_scope
 from content_factory_bot.keyboards.draft import (
     draft_options_keyboard,
     follow_up_keyboard,
@@ -36,7 +36,11 @@ from content_factory_bot.services.profile import format_profile_summary, is_prof
 from content_factory_bot.services.publish import PublishOrchestrator
 from content_factory_bot.services.review import ReviewStep
 from content_factory_bot.services.session_pipeline import process_session_input
+from content_factory_bot.services.stt import transcribe_audio
+from content_factory_bot.services.telegram_files import download_file_bytes
+from content_factory_bot.services.vision import describe_image
 from content_factory_bot.worker.queue import JobQueue
+from content_factory_bot.worker.wait import wait_for_draft_ready
 
 router = Router(name="content_session")
 
@@ -196,6 +200,13 @@ async def on_photo(message: Message, **data) -> None:
     lang = _lang(data)
     uid = message.from_user.id
     file_id = message.photo[-1].file_id
+    transcript = t("session_image_stub", lang)
+    if message.bot:
+        try:
+            raw = await download_file_bytes(message.bot, file_id)
+            transcript = await describe_image(raw, mime="image/jpeg")
+        except Exception:
+            pass
     async with session_scope() as session:
         row = await get_active_session(session, uid)
         if row is None or row.state != "awaiting_input":
@@ -204,10 +215,16 @@ async def on_photo(message: Message, **data) -> None:
             session,
             row.id,
             input_type="image",
-            transcript=t("session_image_stub", lang),
+            transcript=transcript,
             storage_ref=file_id,
         )
-        await message.answer(t("session_image_received", lang))
+        agg = await aggregate_input_text(session, row.id)
+        has_text = await _has_text_input(session, row.id)
+        if agg.strip() and not has_text:
+            await message.answer(t("session_image_drafting", lang))
+            await _run_drafts(message, session, row, lang, uid)
+            return
+    await message.answer(t("session_image_received", lang))
 
 
 @router.message(F.voice | F.audio)
@@ -217,12 +234,21 @@ async def on_voice(message: Message, **data) -> None:
     lang = _lang(data)
     uid = message.from_user.id
     ref = None
+    mime = "audio/ogg"
     if message.voice:
         ref = message.voice.file_id
     elif message.audio:
         ref = message.audio.file_id
+        mime = "audio/mpeg"
     if not ref:
         return
+    transcript = t("session_voice_stub", lang)
+    if message.bot:
+        try:
+            raw = await download_file_bytes(message.bot, ref)
+            transcript = await transcribe_audio(raw, mime=mime)
+        except Exception:
+            pass
     async with session_scope() as session:
         row = await get_active_session(session, uid)
         if row is None or row.state != "awaiting_input":
@@ -231,10 +257,30 @@ async def on_voice(message: Message, **data) -> None:
             session,
             row.id,
             input_type="voice",
-            transcript=t("session_voice_stub", lang),
+            transcript=transcript,
             storage_ref=ref,
         )
-        await message.answer(t("session_voice_received", lang))
+        if transcript.strip():
+            await message.answer(t("session_voice_drafting", lang))
+            await _run_drafts(message, session, row, lang, uid)
+            return
+    await message.answer(t("session_voice_received", lang))
+
+
+async def _has_text_input(session, session_id: int) -> bool:
+    from sqlalchemy import select
+
+    from content_factory_bot.db.models import SessionInput
+
+    result = await session.execute(
+        select(SessionInput.id)
+        .where(
+            SessionInput.session_id == session_id,
+            SessionInput.input_type == "text",
+        )
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
 
 
 async def _run_drafts(
@@ -257,6 +303,18 @@ async def _run_drafts(
         finally:
             await q.close()
         await message.answer(t("session_drafting_queued", lang))
+        try:
+            rnd, options = await wait_for_draft_ready(
+                get_engine(), session_id=row.id, timeout_sec=120.0
+            )
+        except TimeoutError:
+            await message.answer(t("session_drafting_timeout", lang))
+            return
+        async with session_scope() as fresh:
+            row = await get_session_by_id(fresh, row.id, uid)
+            if row is None:
+                return
+            await _send_draft_menu(message, row.id, rnd, options, lang, uid, fresh)
         return
 
     rnd, options = await process_session_input(session, row)
@@ -407,7 +465,7 @@ async def on_session_callback(callback: CallbackQuery, state: FSMContext, **data
                 cover_ref = await CoverStep().generate(draft_text=text, session_id=sid)
                 row.cover_storage_ref = cover_ref
                 await session.commit()
-            results = await PublishOrchestrator().publish_session(
+            results = await PublishOrchestrator(bot=callback.bot).publish_session(
                 session,
                 session_id=sid,
                 telegram_user_id=uid,

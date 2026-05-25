@@ -48,5 +48,13 @@
   "session_image_stub": "[Image attached — vision summary pending]",
   "session_image_received": "Image saved. Send text or voice to continue.",
   "session_voice_stub": "[Voice transcribed — STT pending]",
-  "session_voice_received": "Voice saved. Send more context or text to run drafts."
+  "session_voice_received": "Voice saved. Send more context or text to run drafts.",
+  "session_voice_drafting": "Transcribed voice — drafting…",
+  "session_image_drafting": "Image described — drafting…",
+  "session_drafting_timeout": "Draft timed out. Check worker is running or retry with USE_WORKER=false.",
+  "providers_need_oauth_env": "Set PUBLIC_BASE_URL and OAUTH_STATE_SECRET for Instagram/LinkedIn links.",
+  "providers_help": "Instagram / LinkedIn: use buttons. Telegram: link channel below.",
+  "providers_connect_telegram": "Link Telegram channel",
+  "providers_tg_forward": "Forward any post from your channel here (bot must be admin).",
+  "providers_tg_linked": "Telegram channel linked: {title}"
 }

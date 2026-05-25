@@ -48,5 +48,13 @@
   "session_image_stub": "[Изображение — описание vision позже]",
   "session_image_received": "Фото сохранено. Добавьте текст или голос.",
   "session_voice_stub": "[Голос — расшифровка STT позже]",
-  "session_voice_received": "Голос сохранён. Добавьте текст для черновиков."
+  "session_voice_received": "Голос сохранён. Добавьте текст для черновиков.",
+  "session_voice_drafting": "Голос расшифрован — готовлю черновики…",
+  "session_image_drafting": "Изображение описано — готовлю черновики…",
+  "session_drafting_timeout": "Таймаут черновика. Запустите worker или USE_WORKER=false.",
+  "providers_need_oauth_env": "Нужны PUBLIC_BASE_URL и OAUTH_STATE_SECRET для Instagram/LinkedIn.",
+  "providers_help": "Instagram / LinkedIn — кнопки. Telegram — привязка канала ниже.",
+  "providers_connect_telegram": "Привязать канал Telegram",
+  "providers_tg_forward": "Перешлите пост из канала (бот должен быть админом).",
+  "providers_tg_linked": "Канал привязан: {title}"
 }
