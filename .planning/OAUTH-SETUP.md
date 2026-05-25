@@ -46,6 +46,6 @@ Telegram channel: in-bot flow (Phase 4), not OAuth web.
 
 ## 6. Verify
 
-1. `GET {PUBLIC_BASE_URL}/health` → `{"status":"ok"}`
+1. `GET {PUBLIC_BASE_URL}/health` → `200` with `{"status":"ok","checks":{"database":...,"redis":...,"config":...}}`
 2. Open Instagram start URL from test allowlisted account
 3. Confirm `provider_connections` row `status=active` after callback (Phase 4 implements token exchange)
