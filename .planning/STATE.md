@@ -1,6 +1,6 @@
 # STATE — content-factory-bot
 
-Updated: autonomous v1 phases 0.5–4 complete.
+Updated: handoff after autonomous v1 (phases 0.5–4 code-complete).
 
 ## Milestone
 
