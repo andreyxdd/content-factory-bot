@@ -4,18 +4,49 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
+from content_factory_bot.config import get_settings
 from content_factory_bot.db.models import Creator
 from content_factory_bot.db.session import session_scope
+from content_factory_bot.keyboards.draft import (
+    draft_options_keyboard,
+    follow_up_keyboard,
+    publish_keyboard,
+)
 from content_factory_bot.locale.i18n import t
 from content_factory_bot.middleware.locale import UI_LANG_KEY
-from content_factory_bot.services.content_session import get_active_session, start_session
-from content_factory_bot.services.profile import is_profile_ready
+from content_factory_bot.services.content_session import (
+    aggregate_input_text,
+    get_active_session,
+    get_latest_draft_round,
+    get_session_by_id,
+    next_round_no,
+    parse_options,
+    resume_session,
+    save_draft_round,
+    save_media_input,
+    save_text_input,
+    select_draft_option,
+    set_final_draft,
+    set_session_state,
+    start_session,
+)
+from content_factory_bot.services.cover import CoverStep
+from content_factory_bot.services.draft import DraftOrchestrator
+from content_factory_bot.services.profile import format_profile_summary, is_profile_ready
+from content_factory_bot.services.publish import PublishOrchestrator
+from content_factory_bot.services.review import ReviewStep
+from content_factory_bot.services.session_pipeline import process_session_input
+from content_factory_bot.worker.queue import JobQueue
 
 router = Router(name="content_session")
 
 
 class NewSessionStates(StatesGroup):
     setup = State()
+
+
+class SessionCustomStates(StatesGroup):
+    draft_custom = State()
 
 
 def _setup_keyboard(lang: str, *, research: bool, cover: bool) -> InlineKeyboardMarkup:
@@ -40,11 +71,15 @@ def _setup_keyboard(lang: str, *, research: bool, cover: bool) -> InlineKeyboard
     )
 
 
+def _lang(data: dict) -> str:
+    return data.get(UI_LANG_KEY, "en")
+
+
 @router.message(Command("new"))
 async def cmd_new(message: Message, state: FSMContext, **data) -> None:
     if not message.from_user:
         return
-    lang = data.get(UI_LANG_KEY, "en")
+    lang = _lang(data)
     uid = message.from_user.id
     async with session_scope() as session:
         if not await is_profile_ready(session, uid):
@@ -68,7 +103,7 @@ async def cmd_new(message: Message, state: FSMContext, **data) -> None:
 async def on_session_setup(callback: CallbackQuery, state: FSMContext, **data) -> None:
     if not callback.from_user or not callback.data:
         return
-    lang = data.get(UI_LANG_KEY, "en")
+    lang = _lang(data)
     uid = callback.from_user.id
     fsm = await state.get_data()
     research = bool(fsm.get("research", True))
@@ -108,3 +143,318 @@ async def on_session_setup(callback: CallbackQuery, state: FSMContext, **data) -
         return
 
     await callback.answer()
+
+
+@router.message(F.text)
+async def on_text_message(message: Message, state: FSMContext, **data) -> None:
+    if not message.from_user or not message.text:
+        return
+    if message.text.startswith("/"):
+        return
+
+    lang = _lang(data)
+    uid = message.from_user.id
+    fsm_state = await state.get_state()
+
+    if fsm_state == SessionCustomStates.draft_custom.state:
+        fsm = await state.get_data()
+        sid = int(fsm["session_id"])
+        async with session_scope() as session:
+            row = await get_session_by_id(session, sid, uid)
+            if row is None:
+                await state.clear()
+                await message.answer(t("session_not_found", lang))
+                return
+            await set_final_draft(session, row, message.text)
+            await _after_confirm(message, session, row, lang)
+        await state.clear()
+        return
+
+    async with session_scope() as session:
+        row = await get_active_session(session, uid)
+        if row is None:
+            return
+        if row.state == "awaiting_input":
+            await save_text_input(session, row.id, message.text)
+            await _run_drafts(message, session, row, lang, uid)
+            return
+        if row.state == "awaiting_custom_draft":
+            row.final_draft_text = message.text
+            await session.commit()
+            await set_session_state(session, row, "awaiting_follow_up")
+            await message.answer(
+                t("draft_custom_saved", lang),
+                reply_markup=follow_up_keyboard(row.id, lang),
+            )
+            return
+
+
+@router.message(F.photo)
+async def on_photo(message: Message, **data) -> None:
+    if not message.from_user or not message.photo:
+        return
+    lang = _lang(data)
+    uid = message.from_user.id
+    file_id = message.photo[-1].file_id
+    async with session_scope() as session:
+        row = await get_active_session(session, uid)
+        if row is None or row.state != "awaiting_input":
+            return
+        await save_media_input(
+            session,
+            row.id,
+            input_type="image",
+            transcript=t("session_image_stub", lang),
+            storage_ref=file_id,
+        )
+        await message.answer(t("session_image_received", lang))
+
+
+@router.message(F.voice | F.audio)
+async def on_voice(message: Message, **data) -> None:
+    if not message.from_user:
+        return
+    lang = _lang(data)
+    uid = message.from_user.id
+    ref = None
+    if message.voice:
+        ref = message.voice.file_id
+    elif message.audio:
+        ref = message.audio.file_id
+    if not ref:
+        return
+    async with session_scope() as session:
+        row = await get_active_session(session, uid)
+        if row is None or row.state != "awaiting_input":
+            return
+        await save_media_input(
+            session,
+            row.id,
+            input_type="voice",
+            transcript=t("session_voice_stub", lang),
+            storage_ref=ref,
+        )
+        await message.answer(t("session_voice_received", lang))
+
+
+async def _run_drafts(
+    message: Message,
+    session,
+    row,
+    lang: str,
+    uid: int,
+) -> None:
+    await message.answer(t("session_drafting", lang))
+    settings = get_settings()
+    if settings.use_worker:
+        q = JobQueue(settings.redis_url)
+        await q.connect()
+        try:
+            await q.enqueue(
+                "draft_round",
+                {"session_id": row.id, "telegram_user_id": uid},
+            )
+        finally:
+            await q.close()
+        await message.answer(t("session_drafting_queued", lang))
+        return
+
+    rnd, options = await process_session_input(session, row)
+    await _send_draft_menu(message, row.id, rnd, options, lang, uid, session)
+
+
+async def _send_draft_menu(
+    message: Message,
+    session_id: int,
+    round_no: int,
+    options: list[str],
+    lang: str,
+    uid: int,
+    session,
+) -> None:
+    creator = await session.get(Creator, uid)
+    if creator and creator.review_enabled:
+        try:
+            profile = await format_profile_summary(session, uid, lang)
+            critique = await ReviewStep().critique(
+                draft_options=options, profile_summary=profile
+            )
+            await message.answer(t("session_review", lang).format(text=critique[:3500]))
+        except Exception:
+            pass
+    await message.answer(
+        t("session_pick_draft", lang),
+        reply_markup=draft_options_keyboard(session_id, round_no, options, lang),
+    )
+
+
+@router.callback_query(F.data.startswith("cs:"))
+async def on_session_callback(callback: CallbackQuery, state: FSMContext, **data) -> None:
+    if not callback.from_user or not callback.data:
+        return
+    lang = _lang(data)
+    uid = callback.from_user.id
+    parts = callback.data.split(":")
+
+    if parts[1] == "resume" and len(parts) == 3:
+        sid = int(parts[2])
+        async with session_scope() as session:
+            row = await resume_session(session, sid, uid)
+            if row is None:
+                await callback.answer(t("session_not_found", lang), show_alert=True)
+                return
+            await callback.message.answer(  # type: ignore[union-attr]
+                t("session_resumed", lang).format(id=row.id, state=row.state)
+            )
+        await callback.answer()
+        return
+
+    if len(parts) < 3:
+        await callback.answer()
+        return
+
+    sid = int(parts[1])
+
+    async with session_scope() as session:
+        row = await get_session_by_id(session, sid, uid)
+        if row is None:
+            await callback.answer(t("session_not_found", lang), show_alert=True)
+            return
+
+        if parts[2] == "pick" and len(parts) == 5:
+            round_no = int(parts[3])
+            idx = int(parts[4])
+            dr = await get_latest_draft_round(session, sid)
+            if dr is None or dr.round_no != round_no:
+                await callback.answer()
+                return
+            opts = parse_options(dr)
+            await select_draft_option(session, dr, idx)
+            row.final_draft_text = opts[idx]
+            await session.commit()
+            await set_session_state(session, row, "awaiting_follow_up")
+            await callback.message.answer(  # type: ignore[union-attr]
+                t("session_follow_up", lang),
+                reply_markup=follow_up_keyboard(sid, lang),
+            )
+            await callback.answer()
+            return
+
+        if parts[2] == "custom" and len(parts) == 4:
+            await set_session_state(session, row, "awaiting_custom_draft")
+            await state.set_state(SessionCustomStates.draft_custom)
+            await state.update_data(session_id=sid)
+            await callback.message.answer(t("onboarding_custom_prompt", lang))  # type: ignore[union-attr]
+            await callback.answer()
+            return
+
+        if parts[2] == "fu" and len(parts) == 4:
+            action = parts[3]
+            dr = await get_latest_draft_round(session, sid)
+            if dr is None or dr.selected_index is None:
+                await callback.answer()
+                return
+            options = parse_options(dr)
+            selected = options[dr.selected_index]
+            profile = await format_profile_summary(session, uid, lang)
+            input_text = await aggregate_input_text(session, sid)
+            orch = DraftOrchestrator()
+
+            if action == "new":
+                new_opts = await orch.generate_follow_up_round(
+                    profile_summary=profile,
+                    input_text=input_text,
+                    prior_options=options,
+                    selected_index=dr.selected_index,
+                    feedback=None,
+                )
+                rnd = await next_round_no(session, sid)
+                await save_draft_round(session, sid, round_no=rnd, options=new_opts)
+                await set_session_state(session, row, "awaiting_draft_choice")
+                await callback.message.answer(  # type: ignore[union-attr]
+                    t("session_pick_draft", lang),
+                    reply_markup=draft_options_keyboard(sid, rnd, new_opts, lang),
+                )
+            elif action == "refine":
+                new_opts = await orch.refine_selected(
+                    profile_summary=profile,
+                    input_text=input_text,
+                    selected_text=selected,
+                    feedback=None,
+                )
+                rnd = await next_round_no(session, sid)
+                await save_draft_round(
+                    session, sid, round_no=rnd, options=new_opts, is_refinement=True
+                )
+                await set_session_state(session, row, "awaiting_draft_choice")
+                await callback.message.answer(  # type: ignore[union-attr]
+                    t("session_pick_draft", lang),
+                    reply_markup=draft_options_keyboard(sid, rnd, new_opts, lang),
+                )
+            elif action == "confirm":
+                text = row.final_draft_text or selected
+                await set_final_draft(session, row, text)
+                await _after_confirm_callback(callback, session, row, lang)
+            await callback.answer()
+            return
+
+        if parts[2] == "publish":
+            text = row.final_draft_text
+            if not text:
+                await callback.answer(t("session_no_final_draft", lang), show_alert=True)
+                return
+            if row.cover_generation and not row.cover_storage_ref:
+                cover_ref = await CoverStep().generate(draft_text=text, session_id=sid)
+                row.cover_storage_ref = cover_ref
+                await session.commit()
+            results = await PublishOrchestrator().publish_session(
+                session,
+                session_id=sid,
+                telegram_user_id=uid,
+                draft_text=text,
+            )
+            row.state = "published"
+            row.is_active = False
+            await session.commit()
+            lines = "\n".join(
+                f"• <b>{r.provider}</b>: {r.url or r.error or '—'}" for r in results
+            )
+            await callback.message.answer(  # type: ignore[union-attr]
+                t("session_published", lang).format(links=lines)
+            )
+            await callback.answer()
+            return
+
+    await callback.answer()
+
+
+async def _after_confirm(message: Message, session, row, lang: str) -> None:
+    if row.cover_generation:
+        cover_ref = await CoverStep().generate(
+            draft_text=row.final_draft_text or "", session_id=row.id
+        )
+        row.cover_storage_ref = cover_ref
+        await session.commit()
+        await message.answer(t("session_cover_ready", lang).format(ref=cover_ref))
+    await set_session_state(session, row, "awaiting_publish")
+    await message.answer(
+        t("session_ready_publish", lang),
+        reply_markup=publish_keyboard(row.id, lang),
+    )
+
+
+async def _after_confirm_callback(callback: CallbackQuery, session, row, lang: str) -> None:
+    if row.cover_generation:
+        cover_ref = await CoverStep().generate(
+            draft_text=row.final_draft_text or "", session_id=row.id
+        )
+        row.cover_storage_ref = cover_ref
+        await session.commit()
+        await callback.message.answer(  # type: ignore[union-attr]
+            t("session_cover_ready", lang).format(ref=cover_ref)
+        )
+    await set_session_state(session, row, "awaiting_publish")
+    await callback.message.answer(  # type: ignore[union-attr]
+        t("session_ready_publish", lang),
+        reply_markup=publish_keyboard(row.id, lang),
+    )

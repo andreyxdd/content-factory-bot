@@ -7,7 +7,8 @@
 ## Phase 0.5 — Worker (v1 requirement) 🟡
 
 - [x] Redis + `JobQueue` + `cfbot-worker`
-- [ ] Bot enqueues jobs, progress messages, result handlers
+- [x] Worker handles `draft_round` jobs
+- [ ] Bot progress + notify when `USE_WORKER=true`
 
 ## Phase 1 — Gate + onboarding grill ✅
 
@@ -16,25 +17,28 @@
 - [x] `/start`, `/onboarding`, `/profile`, `/settings`, `/help`
 - [ ] `/cancel` FSM cleanup (stub only)
 
-## Phase 2 — Content session core 🟡
+## Phase 2 — Content session core ✅
 
 - [x] `/new` setup (research/cover toggles)
-- [ ] Session input → draft rounds
-- [ ] `/sessions`, resume
-- [ ] Confirm + follow-up menu (original brief)
-- [ ] Session titles
+- [x] Session input → draft rounds
+- [x] `/sessions`, resume
+- [x] Confirm + follow-up menu (original brief)
+- [x] Session titles (first line of input)
 
-## Phase 3 — Multimodal
+## Phase 3 — Multimodal 🟡
 
-- Image download + vision context
-- Voice → STT → text input
+- [x] Image/voice input saved to `session_inputs`
+- [ ] Image download + vision context
+- [ ] Voice → STT → text input
 
-## Phase 4 — Publish (v1 = all providers)
+## Phase 4 — Publish (v1 = all providers) 🟡
 
-- Telegram channel connection + post
-- Instagram OAuth (Meta Graph) + publish
-- LinkedIn OAuth + publish
-- Partial-failure retry per provider
+- [x] Publish orchestrator + `published_artifacts`
+- [x] OAuth callbacks store stub tokens
+- [ ] Telegram channel connection + post
+- [ ] Instagram Graph publish
+- [ ] LinkedIn publish
+- [ ] Partial-failure retry per provider
 
 ## Phase 5 — OpenClaw parity (optional)
 

@@ -1,6 +1,6 @@
 # STATE — content-factory-bot
 
-Updated: handoff after Phase 1 + partial Phase 2 implementation.
+Updated: Phase 2–4 core implemented (TDD, 19 unit tests).
 
 ## Milestone
 
@@ -11,23 +11,22 @@ v1 Telegram Content Factory bot (allowlisted creators, onboarding grill, content
 | Phase | Status | Notes |
 |-------|--------|-------|
 | 0 Scaffold | ✅ | Planning, ADRs, aiogram skeleton |
-| 0.5 Worker | 🟡 | `JobQueue` + `cfbot-worker`; bot does not enqueue LLM jobs yet |
+| 0.5 Worker | 🟡 | `JobQueue` + `cfbot-worker` runs `draft_round`; set `USE_WORKER=true` to enqueue from bot |
 | 1 Onboarding | ✅ | 14-question grill FSM, `/profile` edit, `/settings`, locale detect |
-| 2 Content session | 🟡 | `/new` setup FSM (research/cover toggles) → `awaiting_input`; no input/draft flow yet |
-| 3 Multimodal | ⬜ | |
-| 4 Publish | ⬜ | OAuth stubs only; token exchange not implemented |
-| 5 Scheduled | ⬜ | |
+| 2 Content session | ✅ | Input → research (optional) → drafts → follow-up → confirm → publish |
+| 3 Multimodal | 🟡 | Photo/voice saved; STT/vision stubs (transcript placeholders) |
+| 4 Publish | 🟡 | Publish orchestrator + artifact rows; OAuth stores stub tokens; real Graph/API TBD |
+| 5 Scheduled | ⬜ | `/research` daily push not implemented |
 
 ## Verification last run
 
-- `pytest -m "not integration"` → **14 passed**
+- `pytest -m "not integration"` → **19 passed**
 - `test_job_queue` integration needs Redis (`pytest -m integration`)
 
 ## Key paths
 
 - Spec: `.planning/SPEC.md`
 - Flow: `.planning/FLOW-NEW-SESSION.md`
-- Grill log: `.planning/grill/SESSION-2026-05-25.md`
-- Gaps: `.planning/GAPS.md`
-- Models: `src/content_factory_bot/db/models.py`
+- Draft orchestrator: `src/content_factory_bot/services/draft.py`
+- Session pipeline: `src/content_factory_bot/services/session_pipeline.py`
 - Handoff: `.planning/continue.md`

@@ -65,10 +65,21 @@ async def instagram_callback(
         return HTMLResponse(f"<p>Instagram connect failed: {error}</p>", status_code=400)
     if not code:
         raise HTTPException(400, "Missing code")
-    # Phase 4: exchange code, encrypt tokens, upsert provider_connections
+    uid = int(state) if state and state.isdigit() else 0
+    if uid:
+        from content_factory_bot.db.session import session_scope
+        from content_factory_bot.services.providers import upsert_provider_connection
+
+        async with session_scope() as db:
+            await upsert_provider_connection(
+                db,
+                telegram_user_id=uid,
+                provider=ProviderKind.INSTAGRAM,
+                credentials=f"stub:{code[:16]}",
+                status="active",
+            )
     return HTMLResponse(
-        "<p>Instagram connected (stub). Token exchange lands in Phase 4.</p>"
-        f"<p>state={state}</p>"
+        "<p>Instagram connected. Token stored (exchange stub — wire Meta API for production).</p>"
     )
 
 
@@ -105,7 +116,19 @@ async def linkedin_callback(
         return HTMLResponse(f"<p>LinkedIn connect failed: {error}</p>", status_code=400)
     if not code:
         raise HTTPException(400, "Missing code")
+    uid = int(state) if state and state.isdigit() else 0
+    if uid:
+        from content_factory_bot.db.session import session_scope
+        from content_factory_bot.services.providers import upsert_provider_connection
+
+        async with session_scope() as db:
+            await upsert_provider_connection(
+                db,
+                telegram_user_id=uid,
+                provider=ProviderKind.LINKEDIN,
+                credentials=f"stub:{code[:16]}",
+                status="active",
+            )
     return HTMLResponse(
-        "<p>LinkedIn connected (stub). Token exchange lands in Phase 4.</p>"
-        f"<p>state={state}</p>"
+        "<p>LinkedIn connected. Token stored (exchange stub — wire LinkedIn API for production).</p>"
     )

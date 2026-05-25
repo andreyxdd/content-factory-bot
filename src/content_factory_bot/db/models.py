@@ -94,6 +94,52 @@ class ContentSession(Base):
     web_research: Mapped[bool] = mapped_column(Boolean, default=True)
     cover_generation: Mapped[bool] = mapped_column(Boolean, default=False)
     destinations_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    research_brief: Mapped[str | None] = mapped_column(Text, nullable=True)
+    final_draft_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cover_storage_ref: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
+class SessionInput(Base):
+    __tablename__ = "session_inputs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(Integer, index=True)
+    input_type: Mapped[str] = mapped_column(String(16), default="text")
+    transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
+    storage_ref: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
+class DraftRound(Base):
+    __tablename__ = "draft_rounds"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(Integer, index=True)
+    round_no: Mapped[int] = mapped_column(Integer)
+    options_json: Mapped[str] = mapped_column(Text)
+    selected_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_refinement: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
+class PublishedArtifact(Base):
+    __tablename__ = "published_artifacts"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    session_id: Mapped[int] = mapped_column(Integer, index=True)
+    provider: Mapped[str] = mapped_column(String(32))
+    external_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

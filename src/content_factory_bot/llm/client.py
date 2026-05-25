@@ -24,12 +24,25 @@ class LLMClient:
         self._timeout = timeout
 
     @classmethod
-    def from_settings(cls, *, fast: bool = False) -> "LLMClient":
+    def from_settings(
+        cls,
+        *,
+        fast: bool = False,
+        research: bool = False,
+        review: bool = False,
+    ) -> "LLMClient":
         settings = get_settings()
         api_key = getattr(settings, "openrouter_api_key", None) or ""
         if not api_key:
             raise ValueError("OPENROUTER_API_KEY is not set")
-        model = settings.llm_model_fast if fast else settings.llm_model_draft
+        if research:
+            model = settings.llm_model_research
+        elif review:
+            model = settings.llm_model_review
+        elif fast:
+            model = settings.llm_model_fast
+        else:
+            model = settings.llm_model_draft
         return cls(
             api_key=api_key,
             base_url=settings.llm_base_url,

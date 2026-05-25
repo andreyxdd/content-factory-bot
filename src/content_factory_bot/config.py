@@ -44,6 +44,7 @@ class Settings(BaseSettings):
         default="anthropic/claude-sonnet-4", alias="LLM_MODEL_REVIEW_FALLBACK"
     )
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
+    use_worker: bool = Field(default=False, alias="USE_WORKER")
 
     def parsed_allowlist(self) -> frozenset[int]:
         if not self.allowlist_telegram_ids.strip():
