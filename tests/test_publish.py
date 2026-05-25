@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from content_factory_bot.db.models import Base, ContentSession, Creator
 from content_factory_bot.services.publish import PublishOrchestrator
+from content_factory_bot.db.models import ProviderConnection, ProviderKind
 
 
 @pytest.fixture
@@ -29,6 +30,17 @@ async def db_session() -> AsyncSession:
 @pytest.mark.asyncio
 async def test_publish_creates_artifacts_for_three_providers(db_session: AsyncSession) -> None:
     row = (await db_session.execute(select(ContentSession).limit(1))).scalar_one()
+    for prov in (ProviderKind.TELEGRAM, ProviderKind.INSTAGRAM, ProviderKind.LINKEDIN):
+        db_session.add(
+            ProviderConnection(
+                telegram_user_id=7,
+                provider=prov,
+                status="active",
+                credentials_encrypted='{"access_token":"stub:tok"}',
+                external_account_id="-1001" if prov == ProviderKind.TELEGRAM else None,
+            )
+        )
+    await db_session.commit()
     results = await PublishOrchestrator().publish_session(
         db_session,
         session_id=row.id,
