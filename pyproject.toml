@@ -41,6 +41,7 @@ target-version = "py312"
 cfbot = "content_factory_bot.__main__:run"
 cfbot-worker = "content_factory_bot.worker.runner:run"
 cfbot-api = "content_factory_bot.api.runner:run"
+cfbot-migrate = "content_factory_bot.db.migrate:run"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -25,6 +25,7 @@ cp .env.example .env
 docker compose up -d postgres redis
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
+cfbot-migrate   # or: AUTO_CREATE_TABLES=true in .env for boot-time create_all (dev only)
 
 # Terminal 1 — bot
 python -m content_factory_bot

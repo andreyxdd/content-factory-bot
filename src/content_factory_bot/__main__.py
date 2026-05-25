@@ -7,7 +7,8 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from content_factory_bot.config import get_settings
-from content_factory_bot.db.session import create_tables, init_db, session_scope
+from content_factory_bot.db.schema import ensure_schema
+from content_factory_bot.db.session import init_db, session_scope
 from content_factory_bot.handlers import setup_routers
 from content_factory_bot.middleware.allowlist import AllowlistMiddleware
 from content_factory_bot.middleware.locale import LocaleMiddleware
@@ -22,7 +23,7 @@ async def main() -> None:
     if not settings.bot_token.strip():
         raise SystemExit("BOT_TOKEN is required to run the Telegram bot")
     init_db(settings.database_url)
-    await create_tables()
+    await ensure_schema()
     async with session_scope() as session:
         n = await seed_allowlist(session, settings.parsed_allowlist())
     if n:

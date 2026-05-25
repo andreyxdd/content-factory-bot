@@ -31,12 +31,53 @@ ssh do_redgreen 'bash /opt/content-factory-bot/deploy/scripts/write-env.sh && sy
 
 `content-factory-bot.service` starts only when `/root/.cfbot-bot-token` exists.
 
+## Database
+
+Schema is managed with **Alembic** (`cfbot-migrate`). Boot processes do **not** run DDL in production.
+
+### First prod boot (empty Postgres)
+
+1. After `bootstrap.sh` created `content_factory`, **backup before first service start** (establishes restore habit even on empty DB):
+
+   ```bash
+   ssh do_redgreen 'bash /opt/content-factory-bot/deploy/scripts/backup-db.sh'
+   ```
+
+2. Apply schema, then start units:
+
+   ```bash
+   ssh do_redgreen 'cd /opt/content-factory-bot && .venv/bin/cfbot-migrate'
+   ssh do_redgreen 'systemctl start content-factory-bot content-factory-api content-factory-worker'
+   ```
+
+3. Confirm tables: `sudo -u postgres psql -d content_factory -c '\dt'`
+
+### DB already created by older `create_tables()` on boot
+
+If services ran before Alembic landed, schema may already exist. **Do not** blind `upgrade` on mismatch.
+
+```bash
+ssh do_redgreen 'bash /opt/content-factory-bot/deploy/scripts/backup-db.sh'
+ssh do_redgreen 'cd /opt/content-factory-bot && .venv/bin/cfbot-migrate'   # no-op if already at head
+# If tables exist but alembic_version missing:
+ssh do_redgreen 'cd /opt/content-factory-bot && .venv/bin/alembic stamp head'
+```
+
+Only `stamp head` when `\d` matches the baseline revision (11 tables per `db/models.py`).
+
+### Every deploy that changes schema
+
+```bash
+ssh do_redgreen 'bash /opt/content-factory-bot/deploy/scripts/backup-db.sh'
+ssh do_redgreen 'cd /opt/content-factory-bot && .venv/bin/cfbot-migrate'
+```
+
 ## Updates
 
 ```bash
 rsync -avz --exclude .venv --exclude .git --exclude __pycache__ \
   ./ do_redgreen:/opt/content-factory-bot/
-ssh do_redgreen 'cd /opt/content-factory-bot && .venv/bin/pip install -e . && systemctl restart content-factory-bot content-factory-api content-factory-worker'
+ssh do_redgreen 'cd /opt/content-factory-bot && .venv/bin/pip install -e . && bash deploy/scripts/backup-db.sh && .venv/bin/cfbot-migrate && systemctl restart content-factory-bot content-factory-api content-factory-worker'
 ```
 
 ## Health

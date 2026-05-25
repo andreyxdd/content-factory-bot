@@ -2,7 +2,8 @@ import asyncio
 import logging
 
 from content_factory_bot.config import get_settings
-from content_factory_bot.db.session import create_tables, init_db
+from content_factory_bot.db.schema import ensure_schema
+from content_factory_bot.db.session import init_db
 from content_factory_bot.worker.jobs import handle_job
 from content_factory_bot.worker.queue import JobQueue
 
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 async def _loop() -> None:
     settings = get_settings()
     init_db(settings.database_url)
-    await create_tables()
+    await ensure_schema()
     q = JobQueue(settings.redis_url)
     await q.connect()
     logger.info("Worker listening on %s", q._queue_name)

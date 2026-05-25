@@ -15,13 +15,13 @@
 | Worker | Redis worker from v1 (ADR-0010) |
 | Onboarding | Grill-me 3+1, `questions.yaml`, `/profile` edit |
 | Review step | Optional at onboarding; GPT-4o primary (ADR-0011) |
+| Alembic migrations | `cfbot-migrate`, baseline `20260525_0001`; ADR-0012 |
 
 ## Still open
 
 - [ ] **Meta / LinkedIn app review** calendar (see `.planning/INSTAGRAM-META.md`) — operator task
 - [ ] **v1 target date** / contingency if review slips
 - [ ] Full FSM enum in SPEC (draft list)
-- [ ] Alembic migrations (schema via `create_tables` today)
 - [ ] Per-provider adapter rules document
 - [ ] OpenRouter image route proof for Flux/DALL·E
 - [ ] S3 media upload (storage_ref is Telegram `file_id` for now)

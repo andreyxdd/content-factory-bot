@@ -15,7 +15,7 @@ Adapters in `services/publish/adapters.py` call live APIs only when `access_toke
 ## Open threads
 
 - Meta / LinkedIn app review is operator calendar work (`.planning/INSTAGRAM-META.md`) — not blocked on bot code.
-- Alembic migrations not started; schema still via `create_tables()` on boot.
+- Schema: `cfbot-migrate` / Alembic baseline `20260525_0001` (ADR-0012). Prod: backup + migrate before restart (`deploy/README.md`).
 - Phase 5 (`/research` scheduled push) explicitly skipped in ROADMAP.
 - Cover step still stub (`services/cover.py`); image models in `.planning/MODEL-MATRIX.md` unwired.
 - `USE_WORKER=true` requires `cfbot-worker` running; bot polls DB up to 120s (`worker/wait.py`).
@@ -33,6 +33,7 @@ Adapters in `services/publish/adapters.py` call live APIs only when `access_toke
 cp .env.example .env   # BOT_TOKEN, ALLOWLIST_TELEGRAM_IDS, DATABASE_URL, REDIS_URL
 docker compose up -d postgres redis
 source .venv/bin/activate && pip install -e ".[dev]"
+cfbot-migrate   # or AUTO_CREATE_TABLES=true for dev
 python -m content_factory_bot   # optional: cfbot-worker, cfbot-api for OAuth
 ```
 

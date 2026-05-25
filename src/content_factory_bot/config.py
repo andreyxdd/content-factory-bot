@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     )
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
     use_worker: bool = Field(default=False, alias="USE_WORKER")
+    auto_create_tables: bool = Field(default=False, alias="AUTO_CREATE_TABLES")
     credentials_encryption_key: str = Field(
         default="", alias="CREDENTIALS_ENCRYPTION_KEY"
     )
