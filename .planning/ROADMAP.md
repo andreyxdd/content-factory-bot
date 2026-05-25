@@ -4,22 +4,25 @@
 
 - Planning docs, CONTEXT, ADRs, package skeleton, docker-compose postgres
 
-## Phase 0.5 — Worker (v1 requirement)
+## Phase 0.5 — Worker (v1 requirement) 🟡
 
-- Redis + worker process (research, writing, review, cover, publish jobs)
-- Bot enqueues jobs, progress messages, result handlers
+- [x] Redis + `JobQueue` + `cfbot-worker`
+- [ ] Bot enqueues jobs, progress messages, result handlers
 
-## Phase 1 — Gate + onboarding grill
+## Phase 1 — Gate + onboarding grill ✅
 
-- Allowlist middleware
-- Onboarding FSM (grill-me sequential), `questions.yaml`, `profile_answers`
-- `/start`, `/onboarding`, `/profile` (view/edit answers), `/settings`, `/help`, `/cancel`
+- [x] Allowlist middleware (DB)
+- [x] Onboarding FSM, `questions.yaml` (14), `profile_answers`
+- [x] `/start`, `/onboarding`, `/profile`, `/settings`, `/help`
+- [ ] `/cancel` FSM cleanup (stub only)
 
-## Phase 2 — Content session core
+## Phase 2 — Content session core 🟡
 
-- `/new`, `/sessions`, resume
-- Text input, draft rounds, confirm
-- Session titles, state machine
+- [x] `/new` setup (research/cover toggles)
+- [ ] Session input → draft rounds
+- [ ] `/sessions`, resume
+- [ ] Confirm + follow-up menu (original brief)
+- [ ] Session titles
 
 ## Phase 3 — Multimodal
 
