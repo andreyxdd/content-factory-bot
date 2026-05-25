@@ -9,9 +9,10 @@ from content_factory_bot.handlers.settings import router as settings_router
 
 
 def setup_routers(dp: Dispatcher) -> None:
+    # Commands first — session_router's F.text handler ignores "/" and would swallow updates
+    dp.include_router(common_router)
     dp.include_router(onboarding_router)
     dp.include_router(profile_router)
     dp.include_router(settings_router)
-    dp.include_router(session_router)
-    dp.include_router(common_router)
     dp.include_router(providers_router)
+    dp.include_router(session_router)
