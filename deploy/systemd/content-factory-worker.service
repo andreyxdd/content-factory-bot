@@ -1,0 +1,16 @@
+[Unit]
+Description=Content Factory background worker
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/content-factory-bot
+EnvironmentFile=/opt/content-factory-bot/.env
+ExecStart=/opt/content-factory-bot/.venv/bin/cfbot-worker
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

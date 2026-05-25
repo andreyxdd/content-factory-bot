@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 async def main() -> None:
     settings = get_settings()
+    if not settings.bot_token.strip():
+        raise SystemExit("BOT_TOKEN is required to run the Telegram bot")
     init_db(settings.database_url)
     await create_tables()
     async with session_scope() as session:

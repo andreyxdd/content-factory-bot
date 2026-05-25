@@ -1,0 +1,17 @@
+[Unit]
+Description=Content Factory Telegram bot
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+ConditionPathExists=/root/.cfbot-bot-token
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/content-factory-bot
+EnvironmentFile=/opt/content-factory-bot/.env
+ExecStart=/opt/content-factory-bot/.venv/bin/cfbot
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
