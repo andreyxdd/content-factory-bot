@@ -1,0 +1,40 @@
+[project]
+name = "content-factory-bot"
+version = "0.1.0"
+description = "Telegram Content Factory bot — personality onboarding and multimodal content sessions"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiogram>=3.15,<4",
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.32,<1",
+    "sqlalchemy[asyncio]>=2.0,<3",
+    "asyncpg>=0.30,<1",
+    "alembic>=1.14,<2",
+    "pydantic-settings>=2.6,<3",
+    "httpx>=0.28,<1",
+    "pyyaml>=6.0,<7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-asyncio>=0.24,<1",
+    "ruff>=0.8,<1",
+    "aiosqlite>=0.20,<1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/content_factory_bot"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
