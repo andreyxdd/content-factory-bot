@@ -1,0 +1,105 @@
+from datetime import datetime
+from enum import StrEnum
+
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String, Text, func
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class PrimaryLanguage(StrEnum):
+    EN = "en"
+    RU = "ru"
+
+
+class ProviderKind(StrEnum):
+    TELEGRAM = "telegram"
+    INSTAGRAM = "instagram"
+    LINKEDIN = "linkedin"
+
+
+class Creator(Base):
+    """Allowlisted Creator preferences (1:1 with telegram user id)."""
+
+    __tablename__ = "creators"
+
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    primary_language: Mapped[str] = mapped_column(String(8), default=PrimaryLanguage.EN)
+    review_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    research_default_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class PersonalityProfile(Base):
+    __tablename__ = "personality_profiles"
+
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    ready: Mapped[bool] = mapped_column(Boolean, default=False)
+    profile_version: Mapped[int] = mapped_column(Integer, default=1)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class ProfileAnswer(Base):
+    __tablename__ = "profile_answers"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    question_key: Mapped[str] = mapped_column(String(64))
+    answer_text: Mapped[str] = mapped_column(Text)
+    option_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_custom: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class AllowlistEntry(Base):
+    """Telegram user id permitted to use the bot."""
+
+    __tablename__ = "allowlist_entries"
+
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    added_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    note: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class ProviderConnection(Base):
+    """OAuth or Telegram channel linkage for one Creator × provider."""
+
+    __tablename__ = "provider_connections"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    provider: Mapped[str] = mapped_column(String(32))  # ProviderKind value
+    status: Mapped[str] = mapped_column(String(32), default="pending")  # pending | active | error
+    external_account_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    credentials_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
