@@ -1,0 +1,193 @@
+# Onboarding grill — 14 questions. recommended = 0-based option index.
+
+- key: primary_language
+  prompts:
+    en: "Choose your primary language"
+    ru: "Выберите основной язык"
+  recommended: 0
+  options:
+    en: ["English", "Русский"]
+    ru: ["English", "Русский"]
+
+- key: occupation
+  prompts:
+    en: "What best describes what you do?"
+    ru: "Чем вы в основном занимаетесь?"
+  recommended: 0
+  options:
+    en:
+      - "Founder / builder"
+      - "Expert / practitioner (coach, doctor, engineer, …)"
+      - "Creator / media personality"
+    ru:
+      - "Основатель / строю продукт"
+      - "Эксперт / практик"
+      - "Креатор / медиа"
+
+- key: content_goals
+  prompts:
+    en: "Main content goal right now?"
+    ru: "Главная цель контента сейчас?"
+  recommended: 0
+  options:
+    en:
+      - "Authority in my niche"
+      - "Audience growth"
+      - "Leads or clients"
+    ru:
+      - "Экспертиза в нише"
+      - "Рост аудитории"
+      - "Лиды и клиенты"
+
+- key: audience
+  prompts:
+    en: "Who is your ideal reader?"
+    ru: "Кто ваш идеальный читатель?"
+  recommended: 1
+  options:
+    en:
+      - "Peers in my industry"
+      - "Beginners entering my field"
+      - "Decision-makers (founders, buyers)"
+    ru:
+      - "Коллеги по индустрии"
+      - "Новички в теме"
+      - "ЛПР и покупатели"
+
+- key: voice_tone
+  prompts:
+    en: "Voice tone that fits you?"
+    ru: "Какой тон вам ближе?"
+  recommended: 0
+  options:
+    en:
+      - "Direct, no fluff"
+      - "Warm, conversational"
+      - "Provocative / contrarian"
+    ru:
+      - "Прямо, без воды"
+      - "Тепло, по-человечески"
+      - "Провокация, контраст"
+
+- key: formats
+  prompts:
+    en: "Formats you actually want to ship?"
+    ru: "Какие форматы хотите публиковать?"
+  recommended: 0
+  options:
+    en:
+      - "Short posts + threads"
+      - "Carousels / visual slides"
+      - "Long-form (LinkedIn articles, deep posts)"
+    ru:
+      - "Короткие посты и треды"
+      - "Карусели"
+      - "Лонгриды"
+
+- key: niche_topics
+  prompts:
+    en: "Topics you usually cover?"
+    ru: "Темы, которые вы обычно поднимаете?"
+  recommended: 0
+  options:
+    en:
+      - "One narrow niche only"
+      - "2–3 connected themes"
+      - "Broad mix under one personal brand"
+    ru:
+      - "Одна узкая ниша"
+      - "2–3 связанные темы"
+      - "Широкий микс под личным брендом"
+
+- key: hard_limits
+  prompts:
+    en: "Hard limits (never mention)?"
+    ru: "Жёсткие табу (никогда не упоминать)?"
+  recommended: 0
+  options:
+    en:
+      - "Politics & religion"
+      - "Competitors by name"
+      - "No strong limits — I'll custom"
+    ru:
+      - "Политика и религия"
+      - "Конкуренты по имени"
+      - "Нет жёстких табу — своё"
+
+- key: signature_themes
+  prompts:
+    en: "Themes to weave in often?"
+    ru: "Что часто вплетать в посты?"
+  recommended: 0
+  options:
+    en:
+      - "Personal stories"
+      - "Data / research"
+      - "Actionable how-to"
+    ru:
+      - "Личные истории"
+      - "Данные и исследования"
+      - "Практические how-to"
+
+- key: personal_angle
+  prompts:
+    en: "What makes your content unmistakably yours?"
+    ru: "Что делает контент узнаваемо вашим?"
+  recommended: 0
+  options:
+    en:
+      - "Specific life path / career arc"
+      - "Framework or method I created"
+      - "I'll describe in my own words (custom)"
+    ru:
+      - "Мой путь / карьера"
+      - "Свой фреймворк или метод"
+      - "Опишу своими словами"
+
+- key: human_design
+  prompts:
+    en: "Human Design — use in content?"
+    ru: "Human Design — использовать в контенте?"
+  recommended: 2
+  options:
+    en:
+      - "Yes — I'll type my type (custom)"
+      - "Yes — Generator / MG / Projector / Reflector"
+      - "No — skip this lens"
+    ru:
+      - "Да — напишу тип (своё)"
+      - "Да — Генератор / Проектор / др."
+      - "Нет — пропустить"
+
+- key: cadence
+  prompts:
+    en: "Realistic posting cadence?"
+    ru: "Реалистичный ритм публикаций?"
+  recommended: 1
+  options:
+    en:
+      - "Daily"
+      - "Few times per week"
+      - "Weekly or less"
+    ru:
+      - "Ежедневно"
+      - "Несколько раз в неделю"
+      - "Раз в неделю или реже"
+
+- key: web_research
+  prompts:
+    en: "Enable web research before drafts? (trend brief from live web)"
+    ru: "Включить веб-исследование перед черновиками?"
+  recommended: 0
+  options:
+    en: ["Yes, research by default", "No, I'll bring my own context"]
+    ru: ["Да, исследование по умолчанию", "Нет, свой контекст"]
+
+- key: review_agent
+  prompts:
+    en: "Enable review agent on drafts? (quality check before you pick)"
+    ru: "Включить агента-рецензента для черновиков?"
+  recommended: 0
+  options:
+    en: ["Yes, review drafts", "No, I'll judge myself"]
+    ru: ["Да, проверять черновики", "Нет, сам(а)"]
