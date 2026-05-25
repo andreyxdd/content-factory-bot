@@ -13,5 +13,20 @@
   "profile_pending": "Profile — Phase 1.",
   "cancel_idle": "Nothing to cancel.",
   "locale_detected_ru": "Continuing in Russian based on your Telegram language.",
-  "locale_detected_en": "Continuing in English."
+  "locale_detected_en": "Continuing in English.",
+  "start_need_onboarding": "Run /onboarding to set up your personal profile first.",
+  "onboarding_suggested": "Suggested",
+  "onboarding_custom_prompt": "Type your answer in a message.",
+  "onboarding_complete": "Profile ready. Use /new to create content.",
+  "onboarding_required": "Complete /onboarding first.",
+  "profile_title": "Your profile",
+  "profile_updated": "Answer updated.",
+  "settings_language": "Choose bot language:",
+  "settings_saved": "Language saved.",
+  "session_setup_intro": "New session — toggle options, then start:",
+  "session_research": "Web research",
+  "session_cover": "Cover / thumbnail",
+  "session_start": "Start session",
+  "session_send_input": "Session #{id} started. Send text, image, or voice.",
+  "session_active_exists": "You have an active session. Finish or /cancel first."
 }
