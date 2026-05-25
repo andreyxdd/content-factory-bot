@@ -1,0 +1,17 @@
+{
+  "welcome": "Добро пожаловать в Content Factory.",
+  "not_allowlisted": "Бот только по приглашению. Ваш аккаунт не в списке доступа.",
+  "not_authorized": "Нет доступа.",
+  "start_body": "Впервые здесь? Запустите /onboarding — профиль личности.\nЗатем /new для создания контента.\n\n/help — все команды.",
+  "choose_language": "Выберите основной язык:",
+  "lang_en": "English",
+  "lang_ru": "Русский",
+  "help": "<b>Content Factory Bot</b>\n\n<b>Команды</b>\n/start — Старт\n/new — Новая сессия\n/sessions — Список сессий\n/onboarding — Настройка личности\n/providers — Подключить аккаунты\n/profile — Ваши ответы\n/settings — Язык\n/cancel — Отмена\n/help — Эта справка",
+  "onboarding_pending": "Онбординг — фаза 1.",
+  "sessions_pending": "Сессии — фаза 2.",
+  "new_pending": "Сессии контента — фаза 2. Сначала /onboarding.",
+  "profile_pending": "Профиль — фаза 1.",
+  "cancel_idle": "Нечего отменять.",
+  "locale_detected_ru": "Продолжаем на русском (язык вашего Telegram).",
+  "locale_detected_en": "Continuing in English."
+}

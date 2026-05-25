@@ -1,0 +1,17 @@
+{
+  "welcome": "Welcome to Content Factory.",
+  "not_allowlisted": "This bot is invite-only. Your account is not on the allowlist.",
+  "not_authorized": "Not authorized.",
+  "start_body": "First time here? Run /onboarding to build your personality profile.\nThen /new to start creating content.\n\n/help for all commands.",
+  "choose_language": "Choose your primary language:",
+  "lang_en": "English",
+  "lang_ru": "Russian",
+  "help": "<b>Content Factory Bot</b>\n\n<b>Commands</b>\n/start — Welcome\n/new — New content session\n/sessions — List sessions\n/onboarding — Personality setup\n/providers — Connect accounts\n/profile — Your answers\n/settings — Language\n/cancel — Cancel flow\n/help — This message",
+  "onboarding_pending": "Onboarding — Phase 1.",
+  "sessions_pending": "Sessions — Phase 2.",
+  "new_pending": "Content sessions — Phase 2. Finish /onboarding first.",
+  "profile_pending": "Profile — Phase 1.",
+  "cancel_idle": "Nothing to cancel.",
+  "locale_detected_ru": "Continuing in Russian based on your Telegram language.",
+  "locale_detected_en": "Continuing in English."
+}
