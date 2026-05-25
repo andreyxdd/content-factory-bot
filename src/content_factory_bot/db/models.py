@@ -83,6 +83,23 @@ class AllowlistEntry(Base):
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
+class ContentSession(Base):
+    __tablename__ = "content_sessions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    title: Mapped[str] = mapped_column(String(255), default="Untitled")
+    state: Mapped[str] = mapped_column(String(32), default="setup")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    web_research: Mapped[bool] = mapped_column(Boolean, default=True)
+    cover_generation: Mapped[bool] = mapped_column(Boolean, default=False)
+    destinations_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
 class ProviderConnection(Base):
     """OAuth or Telegram channel linkage for one Creator × provider."""
 

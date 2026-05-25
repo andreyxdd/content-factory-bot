@@ -4,6 +4,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from content_factory_bot.config import get_settings
 from content_factory_bot.db.session import create_tables, init_db, session_scope
@@ -29,7 +30,7 @@ async def main() -> None:
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-    dp = Dispatcher()
+    dp = Dispatcher(storage=MemoryStorage())
     dp.message.middleware(LocaleMiddleware())
     dp.callback_query.middleware(LocaleMiddleware())
     dp.message.middleware(AllowlistMiddleware())
@@ -40,5 +41,9 @@ async def main() -> None:
     await dp.start_polling(bot)
 
 
-if __name__ == "__main__":
+def run() -> None:
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    run()

@@ -6,6 +6,7 @@ from content_factory_bot.db.session import session_scope
 from content_factory_bot.locale.i18n import t
 from content_factory_bot.middleware.locale import UI_LANG_KEY
 from content_factory_bot.services.creators import ensure_creator
+from content_factory_bot.services.profile import is_profile_ready
 
 router = Router(name="common")
 
@@ -31,9 +32,10 @@ async def cmd_start(message: Message, **data) -> None:
     detected = (
         t("locale_detected_ru", lang) if lang == "ru" else t("locale_detected_en", lang)
     )
-    await message.answer(
-        f"{t('welcome', lang)}\n\n{detected}\n\n{t('start_body', lang)}"
-    )
+    async with session_scope() as session:
+        ready = await is_profile_ready(session, uid)
+    hint = t("start_body", lang) if ready else t("start_need_onboarding", lang)
+    await message.answer(f"{t('welcome', lang)}\n\n{detected}\n\n{hint}")
 
 
 @router.message(Command("help"))
@@ -41,24 +43,11 @@ async def cmd_help(message: Message, **data) -> None:
     await message.answer(t("help", _lang(message, data)))
 
 
-@router.message(Command("new"))
-async def cmd_new(message: Message, **data) -> None:
-    await message.answer(t("new_pending", _lang(message, data)))
-
-
 @router.message(Command("sessions"))
 async def cmd_sessions(message: Message, **data) -> None:
     await message.answer(t("sessions_pending", _lang(message, data)))
 
 
-@router.message(Command("onboarding"))
-async def cmd_onboarding(message: Message, **data) -> None:
-    await message.answer(t("onboarding_pending", _lang(message, data)))
-
-
-@router.message(Command("profile"))
-async def cmd_profile(message: Message, **data) -> None:
-    await message.answer(t("profile_pending", _lang(message, data)))
 
 
 @router.message(Command("cancel"))
