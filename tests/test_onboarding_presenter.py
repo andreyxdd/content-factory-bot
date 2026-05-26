@@ -20,6 +20,8 @@ def test_question_keyboard_has_three_numeric_buttons_only() -> None:
     kb = question_keyboard(q, "en")
     buttons = [btn for row in kb.inline_keyboard for btn in row]
     assert len(buttons) == 3
+    assert len(kb.inline_keyboard) == 3
+    assert all(len(row) == 1 for row in kb.inline_keyboard)
     assert [b.text for b in buttons] == ["1", "2", "3"]
     assert all("custom" not in b.callback_data for b in buttons)
     assert buttons[0].callback_data == "ob:occupation:0"
