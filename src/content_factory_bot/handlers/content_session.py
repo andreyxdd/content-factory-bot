@@ -32,7 +32,9 @@ from content_factory_bot.services.content_session import (
 )
 from content_factory_bot.services.cover import CoverStep
 from content_factory_bot.services.draft import DraftOrchestrator
+from content_factory_bot.handlers.providers_screen import send_providers_screen
 from content_factory_bot.services.profile import format_profile_summary, is_profile_ready
+from content_factory_bot.services.providers import is_setup_complete, list_active_providers
 from content_factory_bot.services.publish import PublishOrchestrator
 from content_factory_bot.services.review import ReviewStep
 from content_factory_bot.services.session_pipeline import process_session_input
@@ -53,11 +55,42 @@ class SessionCustomStates(StatesGroup):
     draft_custom = State()
 
 
-def _setup_keyboard(lang: str, *, research: bool, cover: bool) -> InlineKeyboardMarkup:
+def _dest_label(lang: str, provider: str, selected: bool) -> str:
+    mark = "✅ " if selected else ""
+    return f"{mark}{provider}"
+
+
+def _setup_keyboard(
+    lang: str,
+    *,
+    research: bool,
+    cover: bool,
+    connected: list[str],
+    selected: set[str],
+) -> InlineKeyboardMarkup:
     r = "✅ " if research else ""
     c = "✅ " if cover else ""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+    rows: list[list[InlineKeyboardButton]] = []
+    if len(connected) >= 2:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=t("session_destinations_header", lang),
+                    callback_data="cs:noop",
+                )
+            ]
+        )
+        for prov in connected:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        text=_dest_label(lang, prov, prov in selected),
+                        callback_data=f"cs:dest:{prov}",
+                    )
+                ]
+            )
+    rows.extend(
+        [
             [
                 InlineKeyboardButton(
                     text=f"{r}{t('session_research', lang)}",
@@ -73,6 +106,7 @@ def _setup_keyboard(lang: str, *, research: bool, cover: bool) -> InlineKeyboard
             [InlineKeyboardButton(text=t("session_start", lang), callback_data="cs:start")],
         ]
     )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def _lang(data: dict) -> str:
@@ -89,17 +123,36 @@ async def cmd_new(message: Message, state: FSMContext, **data) -> None:
         if not await is_profile_ready(session, uid):
             await message.answer(t("onboarding_required", lang))
             return
+        if not await is_setup_complete(session, uid):
+            await message.answer(t("providers_setup_required", lang))
+            await send_providers_screen(
+                message, lang=lang, uid=uid, show_skip=True
+            )
+            return
         if await get_active_session(session, uid):
             await message.answer(t("session_active_exists", lang))
             return
         creator = await session.get(Creator, uid)
         research = creator.research_default_enabled if creator else True
+        connected = await list_active_providers(session, uid)
 
+    destinations = list(connected)
     await state.set_state(NewSessionStates.setup)
-    await state.update_data(research=research, cover=False)
+    await state.update_data(
+        research=research,
+        cover=False,
+        destinations=destinations,
+        connected=connected,
+    )
     await message.answer(
         t("session_setup_intro", lang),
-        reply_markup=_setup_keyboard(lang, research=research, cover=False),
+        reply_markup=_setup_keyboard(
+            lang,
+            research=research,
+            cover=False,
+            connected=connected,
+            selected=set(destinations),
+        ),
     )
 
 
@@ -112,12 +165,48 @@ async def on_session_setup(callback: CallbackQuery, state: FSMContext, **data) -
     fsm = await state.get_data()
     research = bool(fsm.get("research", True))
     cover = bool(fsm.get("cover", False))
+    connected: list[str] = list(fsm.get("connected") or [])
+    destinations: list[str] = list(fsm.get("destinations") or connected)
+    selected = set(destinations)
+
+    if callback.data == "cs:noop":
+        await callback.answer()
+        return
+
+    if callback.data.startswith("cs:dest:"):
+        prov = callback.data.split(":", 2)[2]
+        if prov in selected:
+            selected.discard(prov)
+        else:
+            selected.add(prov)
+        if not selected:
+            await callback.answer(t("session_destinations_required", lang), show_alert=True)
+            return
+        destinations = [p for p in connected if p in selected]
+        await state.update_data(destinations=destinations)
+        await callback.message.edit_reply_markup(  # type: ignore[union-attr]
+            reply_markup=_setup_keyboard(
+                lang,
+                research=research,
+                cover=cover,
+                connected=connected,
+                selected=set(destinations),
+            )
+        )
+        await callback.answer()
+        return
 
     if callback.data == "cs:toggle:research":
         research = not research
         await state.update_data(research=research)
         await callback.message.edit_reply_markup(  # type: ignore[union-attr]
-            reply_markup=_setup_keyboard(lang, research=research, cover=cover)
+            reply_markup=_setup_keyboard(
+                lang,
+                research=research,
+                cover=cover,
+                connected=connected,
+                selected=set(destinations),
+            )
         )
         await callback.answer()
         return
@@ -126,18 +215,28 @@ async def on_session_setup(callback: CallbackQuery, state: FSMContext, **data) -
         cover = not cover
         await state.update_data(cover=cover)
         await callback.message.edit_reply_markup(  # type: ignore[union-attr]
-            reply_markup=_setup_keyboard(lang, research=research, cover=cover)
+            reply_markup=_setup_keyboard(
+                lang,
+                research=research,
+                cover=cover,
+                connected=connected,
+                selected=set(destinations),
+            )
         )
         await callback.answer()
         return
 
     if callback.data == "cs:start":
+        if not destinations:
+            await callback.answer(t("session_destinations_required", lang), show_alert=True)
+            return
         async with session_scope() as session:
             row = await start_session(
                 session,
                 uid,
                 web_research=research,
                 cover_generation=cover,
+                destinations=destinations,
             )
         await state.clear()
         await callback.message.answer(  # type: ignore[union-attr]

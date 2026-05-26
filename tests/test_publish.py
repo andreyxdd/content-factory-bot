@@ -49,3 +49,38 @@ async def test_publish_creates_artifacts_for_three_providers(db_session: AsyncSe
     )
     assert len(results) == 3
     assert all(r.url for r in results)
+
+
+@pytest.mark.asyncio
+async def test_publish_honors_session_destinations_subset(db_session: AsyncSession) -> None:
+    import json
+
+    row = (await db_session.execute(select(ContentSession).limit(1))).scalar_one()
+    row.destinations_json = json.dumps([ProviderKind.TELEGRAM])
+    await db_session.commit()
+    db_session.add(
+        ProviderConnection(
+            telegram_user_id=7,
+            provider=ProviderKind.TELEGRAM,
+            status="active",
+            credentials_encrypted='{"access_token":"stub:tok"}',
+            external_account_id="-1001",
+        )
+    )
+    db_session.add(
+        ProviderConnection(
+            telegram_user_id=7,
+            provider=ProviderKind.INSTAGRAM,
+            status="active",
+            credentials_encrypted='{"access_token":"stub:tok"}',
+        )
+    )
+    await db_session.commit()
+    results = await PublishOrchestrator().publish_session(
+        db_session,
+        session_id=row.id,
+        telegram_user_id=7,
+        draft_text="Hello",
+    )
+    assert len(results) == 1
+    assert results[0].provider == ProviderKind.TELEGRAM

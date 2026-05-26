@@ -11,6 +11,7 @@ from content_factory_bot.onboarding.format import parse_text_answer
 from content_factory_bot.onboarding.loader import get_question, load_questions
 from content_factory_bot.onboarding.presenter import show_question
 from content_factory_bot.services.creators import ensure_creator
+from content_factory_bot.handlers.providers_screen import send_providers_screen
 from content_factory_bot.services.profile import (
     apply_creator_preferences,
     get_answered_keys,
@@ -57,10 +58,14 @@ async def _after_answer(
             await mark_profile_ready(session, uid)
             await state.clear()
             text = t("onboarding_complete", lang)
-            if isinstance(event, CallbackQuery):
-                await event.message.answer(text)  # type: ignore[union-attr]
-            else:
-                await event.answer(text)
+            target = event.message if isinstance(event, CallbackQuery) else event
+            await target.answer(text)  # type: ignore[union-attr]
+            await send_providers_screen(
+                target,  # type: ignore[arg-type]
+                lang=lang,
+                uid=uid,
+                show_skip=True,
+            )
             return
 
     await state.set_state(OnboardingStates.in_progress)

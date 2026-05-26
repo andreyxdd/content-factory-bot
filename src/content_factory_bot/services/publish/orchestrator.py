@@ -37,11 +37,7 @@ class PublishOrchestrator:
         row = await db.get(ContentSession, session_id)
         target = providers or _destinations_from_session(row)
         if not target:
-            target = [
-                ProviderKind.TELEGRAM,
-                ProviderKind.INSTAGRAM,
-                ProviderKind.LINKEDIN,
-            ]
+            target = await self._list_active_providers(db, telegram_user_id)
 
         results: list[PublishResult] = []
         for prov in target:
@@ -77,6 +73,17 @@ class PublishOrchestrator:
             )
         await db.commit()
         return results
+
+    async def _list_active_providers(
+        self, db: AsyncSession, telegram_user_id: int
+    ) -> list[str]:
+        result = await db.execute(
+            select(ProviderConnection.provider).where(
+                ProviderConnection.telegram_user_id == telegram_user_id,
+                ProviderConnection.status == "active",
+            )
+        )
+        return list(result.scalars().all())
 
     async def _get_connection(
         self, db: AsyncSession, telegram_user_id: int, provider: str

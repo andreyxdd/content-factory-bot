@@ -5,9 +5,30 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from content_factory_bot.api.oauth_signing import verify_oauth_start
 from content_factory_bot.config import get_settings
-from content_factory_bot.db.models import ProviderKind
+from content_factory_bot.db.models import Creator, ProviderKind
+from content_factory_bot.locale.i18n import t
+from content_factory_bot.services.telegram_notify import notify_creator
 
 router = APIRouter(prefix="/oauth", tags=["oauth"])
+
+
+async def _creator_lang(db, uid: int) -> str:
+    row = await db.get(Creator, uid)
+    return row.primary_language if row else "en"
+
+
+async def _notify_oauth_result(*, uid: int, provider: str, ok: bool, detail: str = "") -> None:
+    if uid <= 0:
+        return
+    from content_factory_bot.db.session import session_scope
+
+    async with session_scope() as session:
+        lang = await _creator_lang(session, uid)
+    if ok:
+        text = t("providers_oauth_success", lang).format(provider=provider)
+    else:
+        text = t("providers_oauth_failed", lang).format(provider=provider, error=detail)
+    await notify_creator(uid, text)
 
 
 def _require_public_base() -> str:
@@ -62,6 +83,8 @@ async def instagram_callback(
     error: str | None = None,
 ) -> HTMLResponse:
     if error:
+        uid = int(state) if state and state.isdigit() else 0
+        await _notify_oauth_result(uid=uid, provider=ProviderKind.INSTAGRAM, ok=False, detail=error)
         return HTMLResponse(f"<p>Instagram connect failed: {error}</p>", status_code=400)
     if not code:
         raise HTTPException(400, "Missing code")
@@ -78,8 +101,9 @@ async def instagram_callback(
                 credentials=f"stub:{code[:16]}",
                 status="active",
             )
+        await _notify_oauth_result(uid=uid, provider=ProviderKind.INSTAGRAM, ok=True)
     return HTMLResponse(
-        "<p>Instagram connected. Token stored (exchange stub — wire Meta API for production).</p>"
+        "<p>Instagram connected. Return to Telegram. Token stored (exchange stub).</p>"
     )
 
 
@@ -113,6 +137,8 @@ async def linkedin_callback(
     error: str | None = None,
 ) -> HTMLResponse:
     if error:
+        uid = int(state) if state and state.isdigit() else 0
+        await _notify_oauth_result(uid=uid, provider=ProviderKind.LINKEDIN, ok=False, detail=error)
         return HTMLResponse(f"<p>LinkedIn connect failed: {error}</p>", status_code=400)
     if not code:
         raise HTTPException(400, "Missing code")
@@ -129,6 +155,7 @@ async def linkedin_callback(
                 credentials=f"stub:{code[:16]}",
                 status="active",
             )
+        await _notify_oauth_result(uid=uid, provider=ProviderKind.LINKEDIN, ok=True)
     return HTMLResponse(
-        "<p>LinkedIn connected. Token stored (exchange stub — wire LinkedIn API for production).</p>"
+        "<p>LinkedIn connected. Return to Telegram. Token stored (exchange stub).</p>"
     )

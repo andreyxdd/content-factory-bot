@@ -9,7 +9,8 @@ Telegram bot for allowlisted creators: interactive **onboarding** (personality p
 - [COMMANDS](.planning/COMMANDS.md) — command catalog
 - [REVIEW](.planning/REVIEW.md) — risks and improvements
 - [ROADMAP](.planning/ROADMAP.md) — phases
-- [Grill session](.planning/grill/SESSION-2026-05-25.md) — open decisions
+- [Grill session](.planning/grill/SESSION-2026-05-25.md) — decisions log
+- [Provider setup plan](.planning/phases/provider-setup/PLAN.md) — `/providers` onboarding flow
 
 Domain language: [CONTEXT.md](CONTEXT.md). Decisions: [docs/adr/](docs/adr/).
 

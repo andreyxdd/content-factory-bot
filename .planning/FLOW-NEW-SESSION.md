@@ -1,9 +1,9 @@
 # `/new` session flow (canonical)
 
 ```
-/new
+/new  [requires setup complete: profile ready + ≥1 provider connection]
   → SETUP (inline keyboards)
-       • Where to post (providers / subset)
+       • Where to post — if 2+ connected: toggles (default **all ON**); if exactly 1: implicit (no toggles)
        • Web research?  [default from onboarding]
        • Cover / thumbnail?  [default OFF]
   → INPUT

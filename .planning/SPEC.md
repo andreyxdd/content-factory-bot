@@ -22,7 +22,8 @@ Source: user brief + [content-factory.md](https://github.com/hesamsheikh/awesome
 | Persistence | Each answer in `profile_answers`; assembled into **personality profile** for writing/review |
 | Research preference | `web_research` → `creators.research_default_enabled` (default **on**); `/new` still offers per-session override |
 | Review preference | `review_agent` → `creators.review_enabled` (default **on**) |
-| Completion | `personality_profile.ready = true` → unlocks `/new` |
+| Completion | `personality_profile.ready = true` → bot **auto-shows** `/providers` UI (same as command); does not unlock `/new` until **setup complete** |
+| Setup complete | ≥1 active **provider connection** → unlocks `/new` |
 | Edit later | `/profile` lists answers; tap one → re-ask that question only (same 3+1 UI); `/settings` for language |
 
 **Goal:** Content must feel **individual and personal** — enough signal for the **writing step** to draft as the Creator, not a generic influencer bot.
@@ -33,15 +34,21 @@ Source: user brief + [content-factory.md](https://github.com/hesamsheikh/awesome
 
 | Provider | Connection mechanism | Publish target |
 |----------|---------------------|----------------|
-| Telegram | Bot added as admin to channel/group; store `chat_id` | Channel post |
+| Telegram | Creator forwards channel post; bot verifies **admin** via `getChatMember`, then stores `chat_id` | Channel post |
 | Instagram | Meta Graph API OAuth via hosted web callback (Business/Creator account) | Feed / Reels per approved scopes |
 | LinkedIn | LinkedIn OAuth via hosted web callback | Member or organization post |
 
-Command surface: `/providers` — list status, connect, disconnect.
+Command surface: **`/providers`** — list status, connect, reconnect, disconnect (inline button + confirm per provider). **`/disconnect <provider>`** shortcut for the same action. No `/connect` alias. First run after onboarding uses the same UI as later **provider management**.
+
+**Gate:** `/new` requires **setup complete** (personality ready + at least one active connection). v1 does **not** require all three providers to be connected.
+
+**Defer:** After auto **provider setup**, Creator may **skip for now** without connecting; `/new` remains blocked with reminder + link to `/providers`. `/profile` and `/settings` stay available.
+
+**Session destinations:** At `/new` setup, from **connected** providers only. **One connected:** implicit destination, no toggles. **Two or more:** toggles default all ON; toggle off per session. Stored on the session; publish orchestrator uses that subset.
 
 **Prerequisites (non-code):** Meta app + LinkedIn developer app submitted for review; test users during development.
 
-**OAuth UX (grill Q3):** `/providers` → URL button → `{PUBLIC_BASE_URL}/oauth/{instagram|linkedin}/start` (signed) → provider OAuth → callback stores tokens. Setup checklist: `.planning/OAUTH-SETUP.md`.
+**OAuth UX (grill Q3):** `/providers` → URL button → `{PUBLIC_BASE_URL}/oauth/{instagram|linkedin}/start` (signed) → provider OAuth → callback stores tokens → **Telegram DM** to Creator + HTML “connected” page. Setup checklist: `.planning/OAUTH-SETUP.md`.
 
 ## 4. Content session (`/new`)
 

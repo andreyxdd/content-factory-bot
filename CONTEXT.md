@@ -34,6 +34,38 @@ _Avoid_: Persona, brand kit, style guide (unless we add explicit brand assets la
 One stored response to a single onboarding `question_key`. Editable later via `/profile` without re-running the full grill.
 _Avoid_: Onboarding response, survey row
 
+**Second brain**:
+Internal durable memory for a Creator — context, voice, and values — compiled into prompts for pipeline steps. Not a separate chat surface in v1; no new Telegram command required.
+_Avoid_: Second Brain Agent (implementation name), persona file, RAG index
+
+**Creator memory**:
+Atomic fact or preference the **second brain** stores beyond **profile answers** (e.g. recurring themes, refined tone rules, lessons from past sessions). Editable by the Creator; may be proposed automatically but not silently overwritten.
+_Avoid_: Memory chunk, embedding, knowledge base row
+
+**Memory note**:
+A single **creator memory** entry: `label`, `body`, and `kind` (`voice` | `values` | `context` | `limit`). Optional `pinned` later. Distinct from **profile answer** (fixed grill keys) and from raw **session input** (ephemeral session material). Injected inside `<memory>`, separate from `<profile>`.
+_Avoid_: Note, snippet, observation
+
+**Memory kind**:
+Category on a **memory note**: how the Creator sounds (`voice`), beliefs/positioning (`values`), situational facts (`context`), or hard boundaries (`limit`). Overlaps onboarding topics but may evolve without re-running the grill.
+_Avoid_: Tag, category slug
+
+**Memory update**:
+Confirming a **memory suggestion** that targets an existing **memory note** (same `kind` + similar `label`) replaces or appends to that note — not a second duplicate row.
+_Avoid_: Merge, patch
+
+**Creator context**:
+The compiled prompt bundle for a Creator: `<profile>` from **profile answers** plus `<memory>` from confirmed **memory notes**. Produced by one compiler used by research, writing, and review steps.
+_Avoid_: Context pack, system prompt
+
+**Memory suggestion**:
+A proposed **memory note** awaiting Creator approval. Created after a **memory trigger** (e.g. session closed); not active in prompts until confirmed.
+_Avoid_: Pending memory, AI draft
+
+**Memory trigger**:
+An event that may enqueue **memory suggestions** (not manual **memory note** creation). v1: session reaches `published` or `closed`; optional later: **profile answer** saved as **custom reply**, refinement **feedback** text.
+_Avoid_: Webhook, cron
+
 **Review step**:
 Optional pipeline step after **writing step** when the Creator enabled it at onboarding. Scores draft quality vs **personality profile** and surfaces short feedback before menu selection.
 _Avoid_: Review agent (implementation name), moderator
@@ -97,7 +129,7 @@ When the Creator asks to edit a single selected **draft option**, the next **dra
 _Avoid_: Edit mode, single-option flow
 
 **Publish intent**:
-The Creator's choice of which connected **providers** receive the finalized content (all connected, or a one-time subset).
+The Creator's choice of which **session destinations** receive the finalized content for one **content session** (one or more connected **providers**, not necessarily all connected).
 _Avoid_: Cross-post, blast
 
 **Published artifact**:
@@ -114,11 +146,40 @@ _Avoid_: Platform, social, integration (as noun)
 OAuth or Telegram-specific linkage storing tokens/scopes/channel ids needed to publish on behalf of the Creator.
 _Avoid_: Account link, auth
 
+**Telegram channel link**:
+In-bot step: Creator forwards a channel/group post; bot checks it is **admin** in that chat, then creates or updates the Telegram **provider connection** with that `chat_id`.
+_Avoid_: Connect Telegram (the DM with the bot is not the publish target)
+
+**OAuth connect confirmation**:
+After Instagram or LinkedIn OAuth callback stores a **provider connection**, the bot sends the Creator a Telegram DM (success or failure) and the browser shows a short HTML confirmation page.
+_Avoid_: Deep link only, silent callback
+
+**Provider setup**:
+The step after **onboarding session** where the Creator links one or more publish targets. The bot opens the `/providers` screen automatically when personality onboarding finishes; `/providers` is also the command to return later.
+_Avoid_: Connect wizard (process name only), `/connect` (use `/providers`)
+
+**Setup complete**:
+Creator may start `/new`: **personality profile** is ready and at least one **provider connection** is `active`. Does not require all three **providers**.
+_Avoid_: Onboarding complete (personality only), profile ready
+
+**Provider setup deferred**:
+Creator finished personality onboarding but left **provider setup** without an active connection (e.g. “Skip for now”). May use `/profile`, `/settings`, `/providers`; `/new` stays blocked with a reminder to link at least one **provider**.
+_Avoid_: Skipped onboarding
+
+**Provider management**:
+Viewing status, connecting, reconnecting, or disconnecting **provider connections** via `/providers` at any time. **Disconnect** via per-provider inline button (with confirm) or `/disconnect <provider>`. Reconnecting replaces the previous link for that **provider** (new OAuth or new forwarded channel).
+_Avoid_: Change profile (use reconnect/disconnect)
+
+**Session destinations**:
+The subset of **provider connections** (status `active`) the Creator selects during `/new` **setup** for that **content session**. If exactly one is connected, that provider is implicit (no destination toggles). If two or more: default **all connected** ON; Creator toggles off for this session. Publish uses only this subset.
+_Avoid_: Publish intent (broader term), platforms
+
 ### Flagged ambiguities
 
 | Term | Conflict | Proposed resolution |
 |------|----------|---------------------|
 | Telegram as provider | Creator already *is* on Telegram; "connect Telegram" unclear | **Provider** means publish target (channel/group), not the bot chat itself |
+| Telegram channel link | Forward alone proves ownership? | On forward, bot must be **admin** in that chat (`getChatMember`) before **provider connection** is saved |
 | Content Factory | OpenClaw doc implies scheduled multi-agent Discord pipeline | This bot implements **interactive** research/write/publish loops; scheduled overnight pipeline is out of MVP unless explicitly added |
 
 ## Example dialogue
@@ -126,6 +187,14 @@ _Avoid_: Account link, auth
 **Expert:** A Creator runs `/new` but hasn't finished onboarding. What happens?
 
 **Dev:** Onboarding session is a hard prerequisite. Bot offers to start or resume onboarding; no content session until personality profile exists.
+
+**Expert:** Onboarding done, but they never linked Instagram. Can they `/new` and post only to Telegram?
+
+**Dev:** Yes, once **setup complete** (≥1 active **provider connection**). At `/new` **setup** they pick **session destinations** only from connected **providers** — e.g. Telegram only. They add Instagram later via `/providers` and use it on the next session.
+
+**Expert:** They connected the wrong LinkedIn account yesterday.
+
+**Dev:** `/providers` → Connect LinkedIn again (OAuth **reconnect** overwrites tokens). Same command as first **provider setup**; no `/connect`.
 
 **Expert:** They pick draft option 2, then hit the fourth button and type "shorter, no emoji."
 
