@@ -47,8 +47,8 @@ The bot's suggested pick among offered options during onboarding or drafting, sh
 _Avoid_: Default, auto-pick
 
 **Custom reply**:
-Free-text input via the fourth menu button when the three fixed options are insufficient.
-_Avoid_: Other, write your own
+Free-text answer typed while an onboarding question is shown, when the three fixed options are insufficient.
+_Avoid_: Other, write your own, fourth button
 
 ### Content workflow
 

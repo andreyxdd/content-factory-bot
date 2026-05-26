@@ -16,6 +16,7 @@
   "locale_detected_en": "Continuing in English.",
   "start_need_onboarding": "Run /onboarding to set up your personal profile first.",
   "onboarding_suggested": "Suggested",
+  "onboarding_pick_or_type": "Tap a number below, or type your own answer in the next message.",
   "onboarding_custom_prompt": "Type your answer in a message.",
   "onboarding_complete": "Profile ready. Use /new to create content.",
   "onboarding_required": "Complete /onboarding first.",

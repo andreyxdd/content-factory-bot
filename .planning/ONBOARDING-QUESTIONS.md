@@ -1,6 +1,6 @@
 # Onboarding grill — question bank
 
-**Mode:** grill-me style — **one question at a time**, Telegram inline keyboard: **recommended** option marked (e.g. ⭐), two alternatives, fourth = **custom reply**.
+**Mode:** grill-me style — **one question at a time**. Message body lists three numbered options (⭐ on recommended); inline keyboard shows **1 / 2 / 3** only. **Custom reply** = type a free-text message (no fourth button).
 
 **14 questions**, ~6–10 minutes. Answers stored per `question_key`; **writing step** and **review step** load full set as context.
 
@@ -50,7 +50,7 @@ Load at runtime from `src/content_factory_bot/onboarding/questions.yaml`.
       - "Лиды и клиенты"
 ```
 
-Bot shows `options[lang][0]` with ⭐ when `recommended: 0`.
+Bot shows numbered `options[lang]` in the message; ⭐ on `recommended` index; buttons are `1`, `2`, `3`.
 
 ---
 
@@ -58,8 +58,8 @@ Bot shows `options[lang][0]` with ⭐ when `recommended: 0`.
 
 0. Before Q1: bot UI already in **Telegram client locale** (see `.planning/I18N.md`). Q1 `primary_language` pre-selects ⭐ on detected language.
 1. Ask all 14 sequentially; no skipping ahead.
-2. Show **recommendation** line before keyboard (“Suggested: …”).
-3. `awaiting_custom_reply` state on 4th button; ignore stray text otherwise.
+2. Show **recommendation** via ⭐ on the numbered option row (no separate “Suggested:” line).
+3. Accept free text in `in_progress` for `current_question_key`; typed `1`/`2`/`3` map to options; ignore `/…`, whitespace-only, and non-text.
 4. On completion: `personality_profile.ready = true`, snapshot `profile_version`.
 5. `/onboarding` full re-run asks confirm; active session blocked (gap G-ONB1).
 

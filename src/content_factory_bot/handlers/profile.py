@@ -50,5 +50,5 @@ async def edit_answer(callback: CallbackQuery, state: FSMContext, **data) -> Non
 
     await state.set_state(OnboardingStates.in_progress)
     await state.update_data(edit_key=key, custom_key=None)
-    await show_question(callback, lang=lang, question_key=key)
+    await show_question(callback, lang=lang, question_key=key, state=state)
     await callback.answer()

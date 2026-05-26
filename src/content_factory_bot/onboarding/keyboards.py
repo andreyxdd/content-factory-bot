@@ -4,15 +4,13 @@ from content_factory_bot.onboarding.loader import Question
 
 
 def question_keyboard(q: Question, lang: str, *, prefix: str = "ob") -> InlineKeyboardMarkup:
-    opts = q.options.get(lang) or q.options["en"]
-    rec = q.recommended
+    del lang  # options shown in message body; keyboard is numeric only
     rows: list[list[InlineKeyboardButton]] = []
     pair: list[InlineKeyboardButton] = []
-    for i, label in enumerate(opts[:3]):
-        text = f"⭐ {label}" if i == rec else label
+    for i in range(3):
         pair.append(
             InlineKeyboardButton(
-                text=text[:64],
+                text=str(i + 1),
                 callback_data=f"{prefix}:{q.key}:{i}",
             )
         )
@@ -21,6 +19,4 @@ def question_keyboard(q: Question, lang: str, *, prefix: str = "ob") -> InlineKe
             pair = []
     if pair:
         rows.append(pair)
-    custom = "✏️ " + ("Свой ответ" if lang == "ru" else "Custom reply")
-    rows.append([InlineKeyboardButton(text=custom, callback_data=f"{prefix}:{q.key}:custom")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

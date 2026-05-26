@@ -1,9 +1,11 @@
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from content_factory_bot.db.session import session_scope
 from content_factory_bot.locale.i18n import t
+from content_factory_bot.onboarding.format import format_question_body
 from content_factory_bot.onboarding.keyboards import question_keyboard
-from content_factory_bot.onboarding.loader import get_question, load_questions, next_unanswered
+from content_factory_bot.onboarding.loader import get_question, next_unanswered
 from content_factory_bot.services.profile import get_answered_keys
 
 
@@ -12,6 +14,7 @@ async def show_question(
     *,
     lang: str,
     question_key: str | None = None,
+    state: FSMContext | None = None,
 ) -> None:
     uid = event.from_user.id  # type: ignore[union-attr]
     async with session_scope() as session:
@@ -26,8 +29,10 @@ async def show_question(
             await event.message.answer(text)  # type: ignore[union-attr]
         return
 
-    rec = q.recommended_label(lang)
-    body = f"<b>{q.prompt(lang)}</b>\n\n{t('onboarding_suggested', lang)}: <i>{rec}</i>"
+    if state is not None:
+        await state.update_data(current_question_key=q.key)
+
+    body = format_question_body(q, lang)
     kb = question_keyboard(q, lang)
     if isinstance(event, Message):
         await event.answer(body, reply_markup=kb)
