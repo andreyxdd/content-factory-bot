@@ -17,9 +17,19 @@ class Question:
     def prompt(self, lang: str) -> str:
         return self.prompts.get(lang) or self.prompts["en"]
 
+    def options_for(self, lang: str) -> list[str]:
+        return list(self.options.get(lang) or self.options["en"])
+
+    def option_count(self, lang: str) -> int:
+        return len(self.options_for(lang))
+
+    @property
+    def choice_only(self) -> bool:
+        counts = {len(opts) for opts in self.options.values()}
+        return counts == {2}
+
     def option_label(self, lang: str, index: int) -> str:
-        opts = self.options.get(lang) or self.options["en"]
-        return opts[index]
+        return self.options_for(lang)[index]
 
     def recommended_label(self, lang: str) -> str:
         return self.option_label(lang, self.recommended)

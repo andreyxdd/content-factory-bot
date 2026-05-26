@@ -16,6 +16,7 @@
   "locale_detected_en": "Continuing in English.",
   "start_need_onboarding": "Сначала /onboarding — настройка личного профиля.",
   "onboarding_suggested": "Рекомендуем",
+  "onboarding_pick_only": "Нажмите кнопку с номером.",
   "onboarding_pick_or_type": "Нажмите кнопку с номером или напишите свой ответ следующим сообщением.",
   "onboarding_custom_prompt": "Напишите ответ сообщением.",
   "onboarding_complete": "Профиль готов. /new — создать контент.",

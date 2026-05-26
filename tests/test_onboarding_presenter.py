@@ -46,3 +46,25 @@ def test_parse_text_answer_custom_verbatim() -> None:
 def test_parse_text_answer_ignores_whitespace() -> None:
     q = next(x for x in load_questions() if x.key == "occupation")
     assert parse_text_answer(q, "en", "   ") is None
+
+
+def test_binary_question_two_buttons_and_no_custom_hint() -> None:
+    q = next(x for x in load_questions() if x.key == "web_research")
+    assert q.choice_only
+    body = format_question_body(q, "en")
+    assert "3." not in body
+    assert t("onboarding_pick_only", "en") in body
+    assert t("onboarding_pick_or_type", "en") not in body
+    kb = question_keyboard(q, "en")
+    buttons = [btn for row in kb.inline_keyboard for btn in row]
+    assert [b.text for b in buttons] == ["1", "2"]
+    assert len(kb.inline_keyboard) == 2
+
+
+def test_binary_question_rejects_free_text() -> None:
+    q = next(x for x in load_questions() if x.key == "web_research")
+    assert parse_text_answer(q, "en", "maybe") is None
+    label, idx, is_custom = parse_text_answer(q, "en", "2")
+    assert label == q.option_label("en", 1)
+    assert idx == 1
+    assert is_custom is False

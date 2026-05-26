@@ -4,9 +4,8 @@ from content_factory_bot.onboarding.loader import Question
 
 
 def question_keyboard(q: Question, lang: str, *, prefix: str = "ob") -> InlineKeyboardMarkup:
-    del lang  # options shown in message body; keyboard is numeric only
     rows: list[list[InlineKeyboardButton]] = []
-    for i in range(3):
+    for i in range(q.option_count(lang)):
         rows.append(
             [
                 InlineKeyboardButton(
