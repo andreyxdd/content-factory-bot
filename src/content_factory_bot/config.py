@@ -8,6 +8,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     bot_token: str = Field(default="", alias="BOT_TOKEN")
+    bot_username: str = Field(
+        default="",
+        alias="BOT_USERNAME",
+        description="Without @; used for t.me redirects after OAuth. Falls back to getMe.",
+    )
     database_url: str = Field(
         default="postgresql+asyncpg://cfbot:cfbot@localhost:5432/content_factory",
         alias="DATABASE_URL",

@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from content_factory_bot.api.oauth_signing import verify_oauth_start
+from content_factory_bot.api.telegram_link import telegram_bot_open_url
 from content_factory_bot.config import get_settings
 from content_factory_bot.db.models import Creator, ProviderKind
 from content_factory_bot.locale.i18n import t
@@ -36,6 +37,15 @@ def _require_public_base() -> str:
     if not settings.public_base_url.strip():
         raise HTTPException(503, "PUBLIC_BASE_URL is not configured")
     return settings.public_base_url.rstrip("/")
+
+
+def _redirect_to_telegram(
+    *, fallback_html: str, fallback_status: int = 200
+) -> RedirectResponse | HTMLResponse:
+    try:
+        return RedirectResponse(url=telegram_bot_open_url(), status_code=302)
+    except RuntimeError:
+        return HTMLResponse(fallback_html, status_code=fallback_status)
 
 
 def _verify_start_query(provider: str, uid: int, exp: int, sig: str) -> None:
@@ -76,16 +86,19 @@ async def instagram_start(
     )
 
 
-@router.get("/instagram/callback")
+@router.get("/instagram/callback", response_model=None)
 async def instagram_callback(
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
-) -> HTMLResponse:
+) -> RedirectResponse | HTMLResponse:
     if error:
         uid = int(state) if state and state.isdigit() else 0
         await _notify_oauth_result(uid=uid, provider=ProviderKind.INSTAGRAM, ok=False, detail=error)
-        return HTMLResponse(f"<p>Instagram connect failed: {error}</p>", status_code=400)
+        return _redirect_to_telegram(
+            fallback_html=f"<p>Instagram connect failed: {error}</p>",
+            fallback_status=400,
+        )
     if not code:
         raise HTTPException(400, "Missing code")
     uid = int(state) if state and state.isdigit() else 0
@@ -102,8 +115,10 @@ async def instagram_callback(
                 status="active",
             )
         await _notify_oauth_result(uid=uid, provider=ProviderKind.INSTAGRAM, ok=True)
-    return HTMLResponse(
-        "<p>Instagram connected. Return to Telegram. Token stored (exchange stub).</p>"
+    return _redirect_to_telegram(
+        fallback_html=(
+            "<p>Instagram connected. Return to Telegram. Token stored (exchange stub).</p>"
+        ),
     )
 
 
@@ -130,16 +145,19 @@ async def linkedin_start(
     )
 
 
-@router.get("/linkedin/callback")
+@router.get("/linkedin/callback", response_model=None)
 async def linkedin_callback(
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
-) -> HTMLResponse:
+) -> RedirectResponse | HTMLResponse:
     if error:
         uid = int(state) if state and state.isdigit() else 0
         await _notify_oauth_result(uid=uid, provider=ProviderKind.LINKEDIN, ok=False, detail=error)
-        return HTMLResponse(f"<p>LinkedIn connect failed: {error}</p>", status_code=400)
+        return _redirect_to_telegram(
+            fallback_html=f"<p>LinkedIn connect failed: {error}</p>",
+            fallback_status=400,
+        )
     if not code:
         raise HTTPException(400, "Missing code")
     uid = int(state) if state and state.isdigit() else 0
@@ -156,6 +174,8 @@ async def linkedin_callback(
                 status="active",
             )
         await _notify_oauth_result(uid=uid, provider=ProviderKind.LINKEDIN, ok=True)
-    return HTMLResponse(
-        "<p>LinkedIn connected. Return to Telegram. Token stored (exchange stub).</p>"
+    return _redirect_to_telegram(
+        fallback_html=(
+            "<p>LinkedIn connected. Return to Telegram. Token stored (exchange stub).</p>"
+        ),
     )

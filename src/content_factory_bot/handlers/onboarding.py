@@ -11,7 +11,7 @@ from content_factory_bot.onboarding.format import parse_text_answer
 from content_factory_bot.onboarding.loader import get_question, load_questions
 from content_factory_bot.onboarding.presenter import show_question
 from content_factory_bot.services.creators import ensure_creator
-from content_factory_bot.handlers.providers_screen import send_providers_screen
+from content_factory_bot.onboarding.completion import finish_onboarding_handoff
 from content_factory_bot.services.profile import (
     apply_creator_preferences,
     get_answered_keys,
@@ -54,18 +54,7 @@ async def _after_answer(
             return
 
         if required.issubset(answered):
-            await apply_creator_preferences(session, uid)
-            await mark_profile_ready(session, uid)
-            await state.clear()
-            text = t("onboarding_complete", lang)
-            target = event.message if isinstance(event, CallbackQuery) else event
-            await target.answer(text)  # type: ignore[union-attr]
-            await send_providers_screen(
-                target,  # type: ignore[arg-type]
-                lang=lang,
-                uid=uid,
-                show_skip=True,
-            )
+            await finish_onboarding_handoff(event, lang=lang, uid=uid, state=state)
             return
 
     await state.set_state(OnboardingStates.in_progress)
@@ -113,13 +102,10 @@ async def on_option(callback: CallbackQuery, state: FSMContext, **data) -> None:
     await callback.answer()
 
 
-@router.message(OnboardingStates.in_progress, F.text)
+@router.message(OnboardingStates.in_progress, F.text, ~F.text.startswith("/"))
 async def on_text_answer(message: Message, state: FSMContext, **data) -> None:
     if not message.from_user or not message.text:
         return
-    if message.text.startswith("/"):
-        return
-
     lang = await _lang(message, data)
     fsm = await state.get_data()
     key = fsm.get("current_question_key")

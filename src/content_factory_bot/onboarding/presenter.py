@@ -2,7 +2,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from content_factory_bot.db.session import session_scope
-from content_factory_bot.locale.i18n import t
+from content_factory_bot.onboarding.completion import finish_onboarding_handoff
 from content_factory_bot.onboarding.format import format_question_body
 from content_factory_bot.onboarding.keyboards import question_keyboard
 from content_factory_bot.onboarding.loader import get_question, next_unanswered
@@ -22,11 +22,9 @@ async def show_question(
 
     q = get_question(question_key) if question_key else next_unanswered(answered)
     if q is None:
-        text = t("onboarding_complete", lang)
-        if isinstance(event, Message):
-            await event.answer(text)
-        else:
-            await event.message.answer(text)  # type: ignore[union-attr]
+        await finish_onboarding_handoff(
+            event, lang=lang, uid=uid, state=state
+        )
         return
 
     if state is not None:
