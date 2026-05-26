@@ -56,6 +56,7 @@
   "session_voice_drafting": "Голос расшифрован — готовлю черновики…",
   "session_image_drafting": "Изображение описано — готовлю черновики…",
   "session_drafting_timeout": "Таймаут черновика. Запустите worker или USE_WORKER=false.",
+  "session_drafting_failed": "Не удалось сгенерировать черновики. Повторите или USE_WORKER=false.",
   "providers_title": "Каналы публикации",
   "providers_intro": "Подключите, куда бот может публиковать.",
   "providers_setup_required": "Сначала привяжите хотя бы один канал (/providers).",

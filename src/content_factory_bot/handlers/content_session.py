@@ -1,3 +1,5 @@
+import asyncio
+
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -6,7 +8,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 
 from content_factory_bot.config import get_settings
 from content_factory_bot.db.models import Creator
-from content_factory_bot.db.session import get_engine, session_scope
+from content_factory_bot.db.session import session_scope
 from content_factory_bot.keyboards.draft import (
     draft_options_keyboard,
     follow_up_keyboard,
@@ -36,13 +38,13 @@ from content_factory_bot.handlers.providers_screen import send_providers_screen
 from content_factory_bot.services.profile import format_profile_summary, is_profile_ready
 from content_factory_bot.services.providers import is_setup_complete, list_active_providers
 from content_factory_bot.services.publish import PublishOrchestrator
-from content_factory_bot.services.review import ReviewStep
+from content_factory_bot.services.draft_delivery import deliver_draft_round
 from content_factory_bot.services.session_pipeline import process_session_input
+from content_factory_bot.services.telegram_notify import notify_creator
 from content_factory_bot.services.stt import transcribe_audio
 from content_factory_bot.services.telegram_files import download_file_bytes
 from content_factory_bot.services.vision import describe_image
 from content_factory_bot.worker.queue import JobQueue
-from content_factory_bot.worker.wait import wait_for_draft_ready
 
 router = Router(name="content_session")
 
@@ -382,6 +384,21 @@ async def _has_text_input(session, session_id: int) -> bool:
     return result.scalar_one_or_none() is not None
 
 
+async def _draft_timeout_watch(
+    session_id: int,
+    uid: int,
+    lang: str,
+    *,
+    timeout_sec: float = 120.0,
+) -> None:
+    await asyncio.sleep(timeout_sec)
+    async with session_scope() as session:
+        row = await get_session_by_id(session, session_id, uid)
+        if row is None or row.state != "drafting":
+            return
+    await notify_creator(uid, t("session_drafting_timeout", lang))
+
+
 async def _run_drafts(
     message: Message,
     session,
@@ -392,6 +409,7 @@ async def _run_drafts(
     await message.answer(t("session_drafting", lang))
     settings = get_settings()
     if settings.use_worker:
+        await set_session_state(session, row, "drafting")
         q = JobQueue(settings.redis_url)
         await q.connect()
         try:
@@ -402,46 +420,20 @@ async def _run_drafts(
         finally:
             await q.close()
         await message.answer(t("session_drafting_queued", lang))
-        try:
-            rnd, options = await wait_for_draft_ready(
-                get_engine(), session_id=row.id, timeout_sec=120.0
-            )
-        except TimeoutError:
-            await message.answer(t("session_drafting_timeout", lang))
-            return
-        async with session_scope() as fresh:
-            row = await get_session_by_id(fresh, row.id, uid)
-            if row is None:
-                return
-            await _send_draft_menu(message, row.id, rnd, options, lang, uid, fresh)
+        asyncio.create_task(
+            _draft_timeout_watch(row.id, uid, lang, timeout_sec=120.0)
+        )
         return
 
     rnd, options = await process_session_input(session, row)
-    await _send_draft_menu(message, row.id, rnd, options, lang, uid, session)
-
-
-async def _send_draft_menu(
-    message: Message,
-    session_id: int,
-    round_no: int,
-    options: list[str],
-    lang: str,
-    uid: int,
-    session,
-) -> None:
-    creator = await session.get(Creator, uid)
-    if creator and creator.review_enabled:
-        try:
-            profile = await format_profile_summary(session, uid, lang)
-            critique = await ReviewStep().critique(
-                draft_options=options, profile_summary=profile
-            )
-            await message.answer(t("session_review", lang).format(text=critique[:3500]))
-        except Exception:
-            pass
-    await message.answer(
-        t("session_pick_draft", lang),
-        reply_markup=draft_options_keyboard(session_id, round_no, options, lang),
+    await deliver_draft_round(
+        telegram_user_id=uid,
+        session_id=row.id,
+        round_no=rnd,
+        options=options,
+        lang=lang,
+        session=session,
+        message=message,
     )
 
 

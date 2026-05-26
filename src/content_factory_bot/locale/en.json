@@ -56,6 +56,7 @@
   "session_voice_drafting": "Transcribed voice — drafting…",
   "session_image_drafting": "Image described — drafting…",
   "session_drafting_timeout": "Draft timed out. Check worker is running or retry with USE_WORKER=false.",
+  "session_drafting_failed": "Draft generation failed. Try again or set USE_WORKER=false.",
   "providers_title": "Publish channels",
   "providers_intro": "Connect where this bot can publish for you.",
   "providers_setup_required": "Link at least one channel before /new.",

@@ -14,10 +14,15 @@ from content_factory_bot.services.content_session import (
 logger = logging.getLogger(__name__)
 
 
+class DraftJobFailedError(Exception):
+    """Worker marked the session draft_failed."""
+
+
 async def wait_for_draft_ready(
     engine: AsyncEngine,
     *,
     session_id: int,
+    min_round_no: int = 0,
     timeout_sec: float = 120.0,
     poll_interval: float = 1.0,
 ) -> tuple[int, list[str]]:
@@ -26,9 +31,16 @@ async def wait_for_draft_ready(
     while asyncio.get_event_loop().time() < deadline:
         async with factory() as session:
             row = await session.get(ContentSession, session_id)
-            if row and row.state == "awaiting_draft_choice":
+            if row is None:
+                await asyncio.sleep(poll_interval)
+                continue
+            if row.state == "draft_failed":
+                raise DraftJobFailedError(
+                    f"draft_round failed for session {session_id}"
+                )
+            if row.state == "awaiting_draft_choice":
                 dr = await get_latest_draft_round(session, session_id)
-                if dr:
+                if dr and dr.round_no > min_round_no:
                     return dr.round_no, parse_options(dr)
         await asyncio.sleep(poll_interval)
     raise TimeoutError(f"draft_round not ready for session {session_id}")

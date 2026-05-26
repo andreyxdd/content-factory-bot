@@ -8,20 +8,16 @@ def draft_options_keyboard(
     lang: str,
 ) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
-    pair: list[InlineKeyboardButton] = []
     for i, label in enumerate(options[:3]):
         text = (label[:60] + "…") if len(label) > 60 else label
-        pair.append(
-            InlineKeyboardButton(
-                text=text,
-                callback_data=f"cs:{session_id}:pick:{round_no}:{i}",
-            )
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=text,
+                    callback_data=f"cs:{session_id}:pick:{round_no}:{i}",
+                )
+            ]
         )
-        if len(pair) == 2:
-            rows.append(pair)
-            pair = []
-    if pair:
-        rows.append(pair)
     custom = "✏️ " + ("Свой ответ" if lang == "ru" else "Custom reply")
     rows.append(
         [
