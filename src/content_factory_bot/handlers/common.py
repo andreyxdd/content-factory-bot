@@ -1,7 +1,7 @@
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from content_factory_bot.db.session import session_scope
 from content_factory_bot.keyboards.draft import sessions_list_keyboard
@@ -16,6 +16,58 @@ from content_factory_bot.services.creators import ensure_creator
 from content_factory_bot.services.profile import is_profile_ready
 
 router = Router(name="common")
+
+
+def _start_first_time_keyboard(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=t("start_btn_onboarding", lang),
+                    callback_data="start:onboarding",
+                )
+            ]
+        ]
+    )
+
+
+def _start_returning_keyboard(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=t("start_btn_profile", lang),
+                    callback_data="start:profile",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=t("start_btn_other_commands", lang),
+                    callback_data="start:other",
+                )
+            ],
+        ]
+    )
+
+
+def _start_other_commands_keyboard(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=t("start_btn_new", lang), callback_data="start:new")],
+            [
+                InlineKeyboardButton(
+                    text=t("start_btn_sessions", lang), callback_data="start:sessions"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=t("start_btn_providers", lang), callback_data="start:providers"
+                )
+            ],
+            [InlineKeyboardButton(text=t("start_btn_help", lang), callback_data="start:help")],
+            [InlineKeyboardButton(text=t("start_btn_back", lang), callback_data="start:back")],
+        ]
+    )
 
 
 def _lang(message: Message, data: dict) -> str:
@@ -42,7 +94,66 @@ async def cmd_start(message: Message, **data) -> None:
     async with session_scope() as session:
         ready = await is_profile_ready(session, uid)
     hint = t("start_body", lang) if ready else t("start_need_onboarding", lang)
-    await message.answer(f"{t('welcome', lang)}\n\n{detected}\n\n{hint}")
+    kb = _start_returning_keyboard(lang) if ready else _start_first_time_keyboard(lang)
+    await message.answer(f"{t('welcome', lang)}\n\n{detected}\n\n{hint}", reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith("start:"))
+async def on_start_menu(callback: CallbackQuery, state: FSMContext, **data) -> None:
+    if not callback.data or not callback.message:
+        await callback.answer()
+        return
+    lang = data.get(UI_LANG_KEY, "en")
+    action = callback.data.split(":", 1)[1]
+
+    if action == "onboarding":
+        from content_factory_bot.handlers.onboarding import cmd_onboarding
+
+        await cmd_onboarding(callback.message, state, **data)  # type: ignore[arg-type]
+        await callback.answer()
+        return
+    if action == "profile":
+        from content_factory_bot.handlers.profile import cmd_profile
+
+        await cmd_profile(callback.message, state, **data)  # type: ignore[arg-type]
+        await callback.answer()
+        return
+    if action == "other":
+        await callback.message.answer(
+            t("start_other_commands_title", lang),
+            reply_markup=_start_other_commands_keyboard(lang),
+        )
+        await callback.answer()
+        return
+    if action == "new":
+        from content_factory_bot.handlers.content_session import cmd_new
+
+        await cmd_new(callback.message, state, **data)  # type: ignore[arg-type]
+        await callback.answer()
+        return
+    if action == "sessions":
+        await cmd_sessions(callback.message, **data)  # type: ignore[arg-type]
+        await callback.answer()
+        return
+    if action == "providers":
+        from content_factory_bot.handlers.providers import cmd_providers
+
+        await cmd_providers(callback.message, **data)  # type: ignore[arg-type]
+        await callback.answer()
+        return
+    if action == "help":
+        await cmd_help(callback.message, **data)  # type: ignore[arg-type]
+        await callback.answer()
+        return
+    if action == "back":
+        await callback.message.answer(
+            t("start_returning_title", lang),
+            reply_markup=_start_returning_keyboard(lang),
+        )
+        await callback.answer()
+        return
+
+    await callback.answer()
 
 
 @router.message(Command("help"))
