@@ -1,7 +1,19 @@
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String, Text, func
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -169,4 +181,102 @@ class ProviderConnection(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
+    )
+
+
+class SupportedLocale(Base):
+    __tablename__ = "supported_locales"
+    __table_args__ = (
+        Index(
+            "uq_supported_locales_single_default",
+            "is_default",
+            unique=True,
+            postgresql_where=text("is_default = true"),
+            sqlite_where=text("is_default = 1"),
+        ),
+    )
+
+    code: Mapped[str] = mapped_column(String(16), primary_key=True)
+    display_name: Mapped[str] = mapped_column(String(64))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
+class ProfileArtifactSet(Base):
+    __tablename__ = "profile_artifact_sets"
+    __table_args__ = (
+        UniqueConstraint(
+            "telegram_user_id",
+            "locale",
+            "profile_version",
+            name="uq_profile_artifact_set_version",
+        ),
+        Index(
+            "uq_profile_artifact_sets_active_locale",
+            "telegram_user_id",
+            "locale",
+            unique=True,
+            postgresql_where=text("is_active = true"),
+            sqlite_where=text("is_active = 1"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    locale: Mapped[str] = mapped_column(
+        String(16), ForeignKey("supported_locales.code"), index=True
+    )
+    profile_version: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(16), default="active")  # pending|active|failed
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    source_locale: Mapped[str | None] = mapped_column(
+        String(16), ForeignKey("supported_locales.code"), nullable=True
+    )
+    style_card_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    values_block_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tribal_block_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    system_prompt_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class TranslationConsentRecord(Base):
+    __tablename__ = "translation_consent_records"
+    __table_args__ = (
+        UniqueConstraint(
+            "telegram_user_id",
+            "source_locale",
+            "target_locale",
+            "policy_version",
+            "approved",
+            name="uq_translation_consent_scope",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    source_locale: Mapped[str] = mapped_column(
+        String(16), ForeignKey("supported_locales.code")
+    )
+    target_locale: Mapped[str] = mapped_column(
+        String(16), ForeignKey("supported_locales.code")
+    )
+    policy_version: Mapped[int] = mapped_column(Integer, default=1)
+    action_id: Mapped[str] = mapped_column(String(64))
+    approved: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
     )

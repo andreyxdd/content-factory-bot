@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from content_factory_bot.config import get_settings
@@ -18,7 +19,7 @@ from content_factory_bot.db.models import Base
 from content_factory_bot.db.schema import ensure_schema
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_HEAD_REVISION = "20260530_0002"
+EXPECTED_HEAD_REVISION = "20260530_0003"
 EXPECTED_TABLES = frozenset(Base.metadata.tables.keys())
 
 
@@ -81,7 +82,9 @@ def test_baseline_migration_defines_all_model_tables() -> None:
     )
     source = migration_path.read_text()
     created = set(re.findall(r'op\.create_table\(\s*\n\s*"([^"]+)"', source))
-    assert created == set(EXPECTED_TABLES)
+    # Baseline defines initial tables only; later migrations can add more.
+    assert created.issubset(set(EXPECTED_TABLES))
+    assert "creators" in created
 
 
 def test_backup_script_is_valid_bash() -> None:
@@ -120,7 +123,7 @@ async def _postgres_reachable(url: str) -> bool:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         return True
-    except Exception:
+    except (OperationalError, DBAPIError, OSError):
         return False
     finally:
         await engine.dispose()
@@ -146,6 +149,25 @@ def _run_migrate_subprocess(database_url: str) -> None:
     )
 
 
+def _run_migrate_downgrade_subprocess(database_url: str, revision: str) -> None:
+    env = os.environ.copy()
+    env["DATABASE_URL"] = database_url
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from alembic import command; "
+                "from content_factory_bot.db.migrate import _alembic_config; "
+                f"command.downgrade(_alembic_config(), '{revision}')"
+            ),
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        check=True,
+    )
+
+
 async def _fetch_schema_state(url: str) -> tuple[set[str], str]:
     engine = create_async_engine(url)
     async with engine.connect() as conn:
@@ -160,6 +182,33 @@ async def _fetch_schema_state(url: str) -> tuple[set[str], str]:
         version = version_row.scalar_one()
     await engine.dispose()
     return tables, version
+
+
+async def _fetch_supported_locales(url: str) -> set[tuple[str, bool]]:
+    engine = create_async_engine(url)
+    async with engine.connect() as conn:
+        rows = await conn.execute(
+            text("SELECT code, is_default FROM supported_locales ORDER BY code")
+        )
+        values = {(code, is_default) for code, is_default in rows}
+    await engine.dispose()
+    return values
+
+
+def test_multi_locale_migration_defines_integrity_constraints() -> None:
+    migration_path = REPO_ROOT / "alembic/versions/20260530_0003_multi_locale_support.py"
+    source = migration_path.read_text()
+    assert "uq_supported_locales_single_default" in source
+    assert "uq_profile_artifact_sets_active_locale" in source
+    assert "ForeignKeyConstraint([\"locale\"], [\"supported_locales.code\"])" in source
+    assert (
+        "ForeignKeyConstraint([\"source_locale\"], [\"supported_locales.code\"])"
+        in source
+    )
+    assert (
+        "ForeignKeyConstraint([\"target_locale\"], [\"supported_locales.code\"])"
+        in source
+    )
 
 
 @pytest.mark.integration
@@ -178,3 +227,23 @@ def test_migrate_upgrade_head_creates_tables_and_version(
     tables, version = asyncio.run(_fetch_schema_state(url))
     assert tables == set(EXPECTED_TABLES)
     assert version == EXPECTED_HEAD_REVISION
+
+
+@pytest.mark.integration
+def test_migrate_round_trip_keeps_seeded_locales(
+    clear_settings_cache: None,
+) -> None:
+    url = _integration_database_url()
+    assert url is not None
+    if not asyncio.run(_postgres_reachable(url)):
+        pytest.skip("Postgres not reachable for integration test")
+
+    asyncio.run(_reset_public_schema(url))
+    _run_migrate_subprocess(url)
+    locales = asyncio.run(_fetch_supported_locales(url))
+    assert locales == {("en", True), ("ru", False)}
+
+    _run_migrate_downgrade_subprocess(url, "20260530_0002")
+    _run_migrate_subprocess(url)
+    locales = asyncio.run(_fetch_supported_locales(url))
+    assert locales == {("en", True), ("ru", False)}
