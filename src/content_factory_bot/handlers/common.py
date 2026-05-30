@@ -94,8 +94,12 @@ async def cmd_start(message: Message, **data) -> None:
     async with session_scope() as session:
         ready = await is_profile_ready(session, uid)
     hint = t("start_body", lang) if ready else t("start_need_onboarding", lang)
+    locale_hint = t("start_change_language_hint", lang)
     kb = _start_returning_keyboard(lang) if ready else _start_first_time_keyboard(lang)
-    await message.answer(f"{t('welcome', lang)}\n\n{detected}\n\n{hint}", reply_markup=kb)
+    await message.answer(
+        f"{t('welcome', lang)}\n\n{detected}\n\n{hint}\n\n{locale_hint}",
+        reply_markup=kb,
+    )
 
 
 @router.callback_query(F.data.startswith("start:"))
