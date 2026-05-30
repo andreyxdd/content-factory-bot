@@ -14,7 +14,9 @@ def _alembic_config() -> Config:
 
 
 def run_upgrade_head() -> None:
-    command.upgrade(_alembic_config(), "head")
+    # Some environments may temporarily carry parallel Alembic heads.
+    # Upgrade all heads to avoid deploy-time failure on `cfbot-migrate`.
+    command.upgrade(_alembic_config(), "heads")
 
 
 def run() -> None:

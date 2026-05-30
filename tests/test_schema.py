@@ -18,7 +18,7 @@ from content_factory_bot.db.models import Base
 from content_factory_bot.db.schema import ensure_schema
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-BASELINE_REVISION = "20260525_0001"
+EXPECTED_HEAD_REVISION = "20260530_0002"
 EXPECTED_TABLES = frozenset(Base.metadata.tables.keys())
 
 
@@ -72,7 +72,7 @@ def test_run_upgrade_head_invokes_alembic_upgrade() -> None:
         run_upgrade_head()
     mock_upgrade.assert_called_once()
     args, kwargs = mock_upgrade.call_args
-    assert args[1] == "head"
+    assert args[1] == "heads"
 
 
 def test_baseline_migration_defines_all_model_tables() -> None:
@@ -177,4 +177,4 @@ def test_migrate_upgrade_head_creates_tables_and_version(
 
     tables, version = asyncio.run(_fetch_schema_state(url))
     assert tables == set(EXPECTED_TABLES)
-    assert version == BASELINE_REVISION
+    assert version == EXPECTED_HEAD_REVISION
