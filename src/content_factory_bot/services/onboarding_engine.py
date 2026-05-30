@@ -26,6 +26,13 @@ S5_KEYS = (
 )
 
 TOGGLE_KEYS = ("web_research", "review_agent")
+REQUIRED_KEYS = (
+    "s2_about",
+    "s2_audience",
+    "s2_reader_feel",
+    "s2_avoid_topics",
+    "s5_voice_betrayal",
+)
 
 
 @dataclass(frozen=True)
@@ -67,7 +74,7 @@ def editable_fields_for_confirm(confirm_step: str) -> tuple[EditField, ...]:
 
 
 def required_answer_keys() -> set[str]:
-    return set(S2_KEYS + S4_KEYS + S5_KEYS + TOGGLE_KEYS)
+    return set(REQUIRED_KEYS)
 
 
 def ordered_profile_keys() -> tuple[str, ...]:

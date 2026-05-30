@@ -68,6 +68,19 @@ RESUME_STEP_ORDER = (
     ("review_agent", "toggle_review"),
 )
 
+SKIPPABLE_STEPS = {
+    "s2_platforms",
+    "s2_goals",
+    "s3_samples",
+    "s4_beliefs",
+    "s4_contradictions",
+    "s4_boundaries",
+    "s4_evolution",
+    "s5_reader_phrase",
+    "toggle_research",
+    "toggle_review",
+}
+
 
 def _lang(data: dict) -> str:
     return data.get(UI_LANG_KEY, "en")
@@ -87,6 +100,11 @@ def _nav_row(lang: str, *, include_back: bool = True) -> list[InlineKeyboardButt
     row.append(InlineKeyboardButton(text=cancel, callback_data="onb:nav:cancel"))
     row.append(InlineKeyboardButton(text=help_text, callback_data="onb:nav:help"))
     return row
+
+
+def _skip_row(lang: str) -> list[InlineKeyboardButton]:
+    text = "⏭️ Пропустить вопрос" if lang == "ru" else "⏭️ Skip question"
+    return [InlineKeyboardButton(text=text, callback_data="onb:nav:skip")]
 
 
 def _kb(
@@ -266,6 +284,13 @@ def _binary_kb(prefix: str, lang: str, *, include_back: bool = True) -> InlineKe
     )
 
 
+def _optional_text_kb(step: str, lang: str) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if step in SKIPPABLE_STEPS:
+        rows.append(_skip_row(lang))
+    return _kb(rows, lang)
+
+
 def _ready_kb(lang: str) -> InlineKeyboardMarkup:
     continue_label = "Продолжить" if lang == "ru" else "Continue"
     return _kb(
@@ -362,7 +387,10 @@ async def _send_prompt(target: Message, state: FSMContext, lang: str, step: str)
             if lang == "ru"
             else "Why do you need content now? You can select multiple and press Done."
         )
-        await target.answer(text, reply_markup=_goal_kb(lang, selected))
+        goal_kb = _goal_kb(lang, selected)
+        if step in SKIPPABLE_STEPS:
+            goal_kb.inline_keyboard.insert(-1, _skip_row(lang))
+        await target.answer(text, reply_markup=goal_kb)
         return
     if step == "s1_ready":
         await target.answer(
@@ -386,12 +414,16 @@ async def _send_prompt(target: Message, state: FSMContext, lang: str, step: str)
         return
     if step == "toggle_research":
         await target.answer(_question_text("toggle_warning", lang))
-        await target.answer(_question_text(step, lang), reply_markup=_binary_kb("onb:toggle:web", lang))
+        toggle_kb = _binary_kb("onb:toggle:web", lang)
+        toggle_kb.inline_keyboard.insert(-1, _skip_row(lang))
+        await target.answer(_question_text(step, lang), reply_markup=toggle_kb)
         return
     if step == "toggle_review":
-        await target.answer(_question_text(step, lang), reply_markup=_binary_kb("onb:toggle:review", lang))
+        toggle_kb = _binary_kb("onb:toggle:review", lang)
+        toggle_kb.inline_keyboard.insert(-1, _skip_row(lang))
+        await target.answer(_question_text(step, lang), reply_markup=toggle_kb)
         return
-    await target.answer(_question_text(step, lang), reply_markup=_kb([], lang))
+    await target.answer(_question_text(step, lang), reply_markup=_optional_text_kb(step, lang))
 
 
 def _next_step(step: str) -> str | None:
@@ -595,6 +627,76 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
         if action == "help":
             text = _help_text(fsm.get("current_step", "fallback"), lang)
             await callback.message.answer(text)
+            await callback.answer()
+            return
+        if action == "skip":
+            step = fsm.get("current_step")
+            if not step or step not in SKIPPABLE_STEPS:
+                await callback.answer(
+                    "Этот вопрос обязателен." if lang == "ru" else "This question is required.",
+                    show_alert=True,
+                )
+                return
+            if step == "s3_samples":
+                style_card = build_style_card([], lang)
+                await state.update_data(
+                    style_card_text=style_card,
+                    current_step="s3_confirm",
+                    flow_stack=list(fsm.get("flow_stack", [])) + ["s3_samples"],
+                )
+                await _show_confirm_blocks(callback.message, state, "s3_confirm", lang)
+                await callback.answer()
+                return
+            if step == "toggle_research":
+                await state.update_data(
+                    current_step="toggle_review",
+                    flow_stack=list(fsm.get("flow_stack", [])) + ["toggle_research"],
+                )
+                await _send_prompt(callback.message, state, lang, "toggle_review")
+                await callback.answer()
+                return
+            if step == "toggle_review":
+                await state.update_data(current_step="done")
+                await _finish_onboarding(callback.message, state, uid, lang)
+                await callback.answer()
+                return
+
+            answers = dict(fsm.get("answers", {}))
+            if step == "s2_goals":
+                answers["s2_goals"] = ""
+                await state.update_data(answers=answers, goal_selected=[])
+                await _persist_answer(uid, "s2_goals", "", None)
+            else:
+                key = _save_text_key(step)
+                if key:
+                    answers[key] = ""
+                    await state.update_data(answers=answers)
+                    await _persist_answer(uid, key, "", None)
+            next_step = _next_step(step)
+            if next_step is None:
+                await callback.answer()
+                return
+            if next_step == "s4_beliefs":
+                await callback.message.answer(_question_text("s4_intro", lang))
+            if next_step == "s5_reader_phrase":
+                await callback.message.answer(_question_text("s5_intro", lang))
+            await state.update_data(current_step=next_step, flow_stack=list(fsm.get("flow_stack", [])) + [step])
+            if next_step == "s4_confirm":
+                values_block = build_values_block(answers, lang)
+                await state.update_data(values_block_text=values_block)
+                await _show_confirm_blocks(callback.message, state, "s4_confirm", lang)
+            elif next_step == "s6_confirm":
+                style = fsm.get("style_card_text", build_style_card([], lang))
+                values = fsm.get("values_block_text", build_values_block(answers, lang))
+                tribal = build_tribal_block(answers, lang)
+                system_prompt = build_system_prompt(answers, style, values, tribal)
+                await state.update_data(
+                    tribal_block_text=tribal,
+                    system_prompt_text=system_prompt,
+                )
+                await _show_confirm_blocks(callback.message, state, "s6_confirm", lang)
+            else:
+                await _send_prompt(callback.message, state, lang, next_step)
             await callback.answer()
             return
         if action == "back":
