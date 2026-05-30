@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from content_factory_bot.handlers.onboarding import on_onboarding_callback
+from content_factory_bot.handlers.onboarding import _optional_text_kb, on_onboarding_callback
 from content_factory_bot.middleware.locale import UI_LANG_KEY
 
 
@@ -73,4 +73,11 @@ async def test_skip_toggle_research_does_not_persist_and_moves_to_review(
         for call in state.update_data.await_args_list
     )
     mock_send_prompt.assert_awaited_once_with(callback.message, state, "en", "toggle_review")
+
+
+def test_optional_step_keyboard_has_help_row_and_nav_skip() -> None:
+    kb = _optional_text_kb("s4_boundaries", "en")
+    callbacks = [btn.callback_data for row in kb.inline_keyboard for btn in row if btn.callback_data]
+    assert "onb:nav:help" in callbacks
+    assert "onb:nav:skip" in callbacks
 

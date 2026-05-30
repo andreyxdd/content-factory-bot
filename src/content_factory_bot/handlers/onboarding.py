@@ -90,20 +90,26 @@ def _yes_set(lang: str) -> set[str]:
     return {"да", "yes", "y", "ok", "готов", "готова"} if lang == "ru" else {"yes", "y", "ok", "ready"}
 
 
-def _nav_row(lang: str, *, include_back: bool = True) -> list[InlineKeyboardButton]:
+def _nav_row(lang: str, *, include_back: bool = True, include_skip: bool = False) -> list[InlineKeyboardButton]:
     back = "⬅️ Назад" if lang == "ru" else "⬅️ Back"
-    cancel = "🛑 Отмена" if lang == "ru" else "🛑 Cancel"
+    cancel = "🛑 Выйти из онбординга" if lang == "ru" else "🛑 Quit onboarding"
     help_text = "❓ Помощь" if lang == "ru" else "❓ Help"
+    skip_text = "⏭️ Пропустить" if lang == "ru" else "⏭️ Skip"
     row = []
     if include_back:
         row.append(InlineKeyboardButton(text=back, callback_data="onb:nav:back"))
     row.append(InlineKeyboardButton(text=cancel, callback_data="onb:nav:cancel"))
-    row.append(InlineKeyboardButton(text=help_text, callback_data="onb:nav:help"))
+    row.append(
+        InlineKeyboardButton(
+            text=skip_text if include_skip else help_text,
+            callback_data="onb:nav:skip" if include_skip else "onb:nav:help",
+        )
+    )
     return row
 
 
 def _skip_row(lang: str) -> list[InlineKeyboardButton]:
-    text = "⏭️ Пропустить вопрос" if lang == "ru" else "⏭️ Skip question"
+    text = "⏭️ Пропустить" if lang == "ru" else "⏭️ Skip"
     return [InlineKeyboardButton(text=text, callback_data="onb:nav:skip")]
 
 
@@ -112,10 +118,16 @@ def _kb(
     lang: str,
     *,
     include_back: bool = True,
+    include_skip: bool = False,
 ) -> InlineKeyboardMarkup:
     rows = list(rows)
-    rows.append(_nav_row(lang, include_back=include_back))
+    rows.append(_nav_row(lang, include_back=include_back, include_skip=include_skip))
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _help_row(lang: str) -> list[InlineKeyboardButton]:
+    text = "❓ Помощь" if lang == "ru" else "❓ Help"
+    return [InlineKeyboardButton(text=text, callback_data="onb:nav:help")]
 
 
 def _question_text(step: str, lang: str) -> str:
@@ -287,8 +299,8 @@ def _binary_kb(prefix: str, lang: str, *, include_back: bool = True) -> InlineKe
 def _optional_text_kb(step: str, lang: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     if step in SKIPPABLE_STEPS:
-        rows.append(_skip_row(lang))
-    return _kb(rows, lang)
+        rows.append(_help_row(lang))
+    return _kb(rows, lang, include_skip=step in SKIPPABLE_STEPS)
 
 
 def _ready_kb(lang: str) -> InlineKeyboardMarkup:
@@ -389,7 +401,8 @@ async def _send_prompt(target: Message, state: FSMContext, lang: str, step: str)
         )
         goal_kb = _goal_kb(lang, selected)
         if step in SKIPPABLE_STEPS:
-            goal_kb.inline_keyboard.insert(-1, _skip_row(lang))
+            goal_kb.inline_keyboard.insert(-1, _help_row(lang))
+            goal_kb.inline_keyboard[-1] = _nav_row(lang, include_skip=True)
         await target.answer(text, reply_markup=goal_kb)
         return
     if step == "s1_ready":
@@ -415,12 +428,14 @@ async def _send_prompt(target: Message, state: FSMContext, lang: str, step: str)
     if step == "toggle_research":
         await target.answer(_question_text("toggle_warning", lang))
         toggle_kb = _binary_kb("onb:toggle:web", lang)
-        toggle_kb.inline_keyboard.insert(-1, _skip_row(lang))
+        toggle_kb.inline_keyboard.insert(-1, _help_row(lang))
+        toggle_kb.inline_keyboard[-1] = _nav_row(lang, include_skip=True)
         await target.answer(_question_text(step, lang), reply_markup=toggle_kb)
         return
     if step == "toggle_review":
         toggle_kb = _binary_kb("onb:toggle:review", lang)
-        toggle_kb.inline_keyboard.insert(-1, _skip_row(lang))
+        toggle_kb.inline_keyboard.insert(-1, _help_row(lang))
+        toggle_kb.inline_keyboard[-1] = _nav_row(lang, include_skip=True)
         await target.answer(_question_text(step, lang), reply_markup=toggle_kb)
         return
     await target.answer(_question_text(step, lang), reply_markup=_optional_text_kb(step, lang))
