@@ -44,20 +44,26 @@ def _yes_set(lang: str) -> set[str]:
     return {"да", "yes", "y", "ok", "готов", "готова"} if lang == "ru" else {"yes", "y", "ok", "ready"}
 
 
-def _nav_row(lang: str) -> list[InlineKeyboardButton]:
+def _nav_row(lang: str, *, include_back: bool = True) -> list[InlineKeyboardButton]:
     back = "⬅️ Назад" if lang == "ru" else "⬅️ Back"
     cancel = "🛑 Отмена" if lang == "ru" else "🛑 Cancel"
     help_text = "❓ Помощь" if lang == "ru" else "❓ Help"
-    return [
-        InlineKeyboardButton(text=back, callback_data="onb:nav:back"),
-        InlineKeyboardButton(text=cancel, callback_data="onb:nav:cancel"),
-        InlineKeyboardButton(text=help_text, callback_data="onb:nav:help"),
-    ]
+    row = []
+    if include_back:
+        row.append(InlineKeyboardButton(text=back, callback_data="onb:nav:back"))
+    row.append(InlineKeyboardButton(text=cancel, callback_data="onb:nav:cancel"))
+    row.append(InlineKeyboardButton(text=help_text, callback_data="onb:nav:help"))
+    return row
 
 
-def _kb(rows: list[list[InlineKeyboardButton]], lang: str) -> InlineKeyboardMarkup:
+def _kb(
+    rows: list[list[InlineKeyboardButton]],
+    lang: str,
+    *,
+    include_back: bool = True,
+) -> InlineKeyboardMarkup:
     rows = list(rows)
-    rows.append(_nav_row(lang))
+    rows.append(_nav_row(lang, include_back=include_back))
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -128,7 +134,7 @@ def _goal_kb(lang: str, selected: set[str]) -> InlineKeyboardMarkup:
     return _kb(rows, lang)
 
 
-def _binary_kb(prefix: str, lang: str) -> InlineKeyboardMarkup:
+def _binary_kb(prefix: str, lang: str, *, include_back: bool = True) -> InlineKeyboardMarkup:
     yes = "Да" if lang == "ru" else "Yes"
     no = "Нет" if lang == "ru" else "No"
     return _kb(
@@ -137,6 +143,16 @@ def _binary_kb(prefix: str, lang: str) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text=no, callback_data=f"{prefix}:no")],
         ],
         lang,
+        include_back=include_back,
+    )
+
+
+def _ready_kb(lang: str) -> InlineKeyboardMarkup:
+    continue_label = "Продолжить" if lang == "ru" else "Continue"
+    return _kb(
+        [[InlineKeyboardButton(text=continue_label, callback_data="onb:ready:yes")]],
+        lang,
+        include_back=False,
     )
 
 
@@ -175,7 +191,10 @@ async def _send_prompt(target: Message, state: FSMContext, lang: str, step: str)
         await target.answer(text, reply_markup=_goal_kb(lang, selected))
         return
     if step == "s1_ready":
-        await target.answer(_question_text(step, lang), reply_markup=_binary_kb("onb:ready", lang))
+        await target.answer(
+            _question_text(step, lang),
+            reply_markup=_ready_kb(lang),
+        )
         return
     if step == "s3_samples":
         analyze = "Анализировать образцы" if lang == "ru" else "Analyze samples"
