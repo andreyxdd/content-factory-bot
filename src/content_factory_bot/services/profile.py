@@ -2,7 +2,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from content_factory_bot.db.models import Creator, PersonalityProfile, ProfileAnswer, PrimaryLanguage
-from content_factory_bot.onboarding.loader import load_questions
+from content_factory_bot.services.onboarding_engine import (
+    ordered_profile_keys,
+    required_answer_keys,
+)
 
 
 async def save_answer(
@@ -47,7 +50,7 @@ async def get_answered_keys(session: AsyncSession, telegram_user_id: int) -> set
 
 async def is_profile_complete(session: AsyncSession, telegram_user_id: int) -> bool:
     answered = await get_answered_keys(session, telegram_user_id)
-    required = {q.key for q in load_questions()}
+    required = required_answer_keys()
     return required.issubset(answered)
 
 
@@ -109,8 +112,28 @@ async def apply_creator_preferences(session: AsyncSession, telegram_user_id: int
 
 async def format_profile_summary(session: AsyncSession, telegram_user_id: int, lang: str) -> str:
     lines: list[str] = []
-    for q in load_questions():
-        ans = await _get_answer(session, telegram_user_id, q.key)
+    for key in ordered_profile_keys():
+        ans = await _get_answer(session, telegram_user_id, key)
         if ans:
-            lines.append(f"<b>{q.prompt(lang)}</b>\n{ans.answer_text}")
+            lines.append(f"<b>{key}</b>\n{ans.answer_text}")
     return "\n\n".join(lines) if lines else "—"
+
+
+async def save_profile_artifacts(
+    session: AsyncSession,
+    telegram_user_id: int,
+    *,
+    style_card_text: str,
+    values_block_text: str,
+    tribal_block_text: str,
+    system_prompt_text: str,
+) -> None:
+    profile = await session.get(PersonalityProfile, telegram_user_id)
+    if profile is None:
+        profile = PersonalityProfile(telegram_user_id=telegram_user_id, ready=False)
+        session.add(profile)
+    profile.style_card_text = style_card_text
+    profile.values_block_text = values_block_text
+    profile.tribal_block_text = tribal_block_text
+    profile.system_prompt_text = system_prompt_text
+    await session.commit()

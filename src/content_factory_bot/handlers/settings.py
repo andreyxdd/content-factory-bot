@@ -2,7 +2,7 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 
-from content_factory_bot.db.models import Creator, PrimaryLanguage
+from content_factory_bot.db.models import Creator
 from content_factory_bot.db.session import session_scope
 from content_factory_bot.locale.i18n import t
 from content_factory_bot.middleware.locale import UI_LANG_KEY

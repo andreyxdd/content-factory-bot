@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from content_factory_bot.db.session import session_scope
 from content_factory_bot.locale.i18n import t
 from content_factory_bot.middleware.locale import UI_LANG_KEY
-from content_factory_bot.onboarding.loader import load_questions
+from content_factory_bot.services.onboarding_engine import EDITABLE_FIELDS
 from content_factory_bot.services.profile import format_profile_summary, is_profile_ready
 
 router = Router(name="profile")
@@ -27,11 +27,11 @@ async def cmd_profile(message: Message, state: FSMContext, **data) -> None:
     rows = [
         [
             InlineKeyboardButton(
-                text=(q.prompt(lang)[:40] + "…") if len(q.prompt(lang)) > 40 else q.prompt(lang),
-                callback_data=f"profile:edit:{q.key}",
+                text=(f.label(lang)[:40] + "…") if len(f.label(lang)) > 40 else f.label(lang),
+                callback_data=f"profile:edit:{f.key}",
             )
         ]
-        for q in load_questions()
+        for f in EDITABLE_FIELDS
     ]
     await message.answer(
         f"<b>{t('profile_title', lang)}</b>\n\n{summary}",
@@ -45,10 +45,9 @@ async def edit_answer(callback: CallbackQuery, state: FSMContext, **data) -> Non
         return
     lang = data.get(UI_LANG_KEY, "en")
     key = callback.data.split(":", 2)[2]
-    from content_factory_bot.handlers.onboarding import OnboardingStates
-    from content_factory_bot.onboarding.presenter import show_question
+    from content_factory_bot.handlers.onboarding import OnboardingStates, _send_prompt
 
     await state.set_state(OnboardingStates.in_progress)
-    await state.update_data(edit_key=key, custom_key=None)
-    await show_question(callback, lang=lang, question_key=key, state=state)
+    await state.update_data(current_step=key, pending_edit_key=key)
+    await _send_prompt(callback.message, state, lang, key)  # type: ignore[arg-type]
     await callback.answer()

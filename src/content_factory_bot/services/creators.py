@@ -1,4 +1,3 @@
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from content_factory_bot.db.models import Creator, PersonalityProfile

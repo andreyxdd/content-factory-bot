@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from content_factory_bot.db.models import Base, Creator, PersonalityProfile
-from content_factory_bot.onboarding.loader import load_questions
+from content_factory_bot.services.onboarding_engine import required_answer_keys
 from content_factory_bot.services.profile import (
     apply_creator_preferences,
     is_profile_complete,
@@ -27,14 +27,14 @@ async def db_session() -> AsyncSession:
 @pytest.mark.asyncio
 async def test_save_answer_and_completion(db_session: AsyncSession) -> None:
     uid = 1
-    for q in load_questions():
+    for key in required_answer_keys():
         await save_answer(
             db_session,
             telegram_user_id=uid,
-            question_key=q.key,
-            answer_text=q.option_label("en", q.recommended),
-            option_index=q.recommended,
-            is_custom=False,
+            question_key=key,
+            answer_text="value",
+            option_index=None,
+            is_custom=True,
         )
     assert await is_profile_complete(db_session, uid) is True
 

@@ -3,7 +3,7 @@ import json
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from content_factory_bot.db.models import Base, ContentSession, Creator
+from content_factory_bot.db.models import Base, Creator
 from content_factory_bot.services.content_session import start_session
 
 

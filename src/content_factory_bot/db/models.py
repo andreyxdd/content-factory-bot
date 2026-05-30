@@ -46,6 +46,10 @@ class PersonalityProfile(Base):
     telegram_user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     ready: Mapped[bool] = mapped_column(Boolean, default=False)
     profile_version: Mapped[int] = mapped_column(Integer, default=1)
+    style_card_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    values_block_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tribal_block_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    system_prompt_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

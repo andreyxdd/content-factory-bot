@@ -1,5 +1,5 @@
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from content_factory_bot.db.models import Base, ContentSession, Creator
 from content_factory_bot.services.content_session import save_draft_round, set_session_state

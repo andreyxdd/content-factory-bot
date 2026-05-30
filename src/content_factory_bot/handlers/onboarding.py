@@ -1,22 +1,32 @@
+from __future__ import annotations
+
+import re
+
+import httpx
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from content_factory_bot.db.session import session_scope
-from content_factory_bot.locale.i18n import t
+from content_factory_bot.handlers.providers_screen import send_providers_screen
 from content_factory_bot.middleware.locale import UI_LANG_KEY
-from content_factory_bot.onboarding.format import parse_text_answer
-from content_factory_bot.onboarding.loader import get_question, load_questions
-from content_factory_bot.onboarding.presenter import show_question
 from content_factory_bot.services.creators import ensure_creator
-from content_factory_bot.onboarding.completion import finish_onboarding_handoff
+from content_factory_bot.services.onboarding_engine import (
+    EDITABLE_FIELDS,
+    build_s2_summary,
+    build_style_card,
+    build_system_prompt,
+    build_tribal_block,
+    build_values_block,
+    extract_first_url,
+)
 from content_factory_bot.services.profile import (
     apply_creator_preferences,
-    get_answered_keys,
     mark_profile_ready,
     save_answer,
+    save_profile_artifacts,
 )
 
 router = Router(name="onboarding")
@@ -26,103 +36,563 @@ class OnboardingStates(StatesGroup):
     in_progress = State()
 
 
-async def _lang(event: Message | CallbackQuery, data: dict) -> str:
+def _lang(data: dict) -> str:
     return data.get(UI_LANG_KEY, "en")
 
 
-async def _after_answer(
-    event: Message | CallbackQuery,
-    state: FSMContext,
-    *,
-    lang: str,
-    uid: int,
-) -> None:
+def _yes_set(lang: str) -> set[str]:
+    return {"да", "yes", "y", "ok", "готов", "готова"} if lang == "ru" else {"yes", "y", "ok", "ready"}
+
+
+def _nav_row(lang: str) -> list[InlineKeyboardButton]:
+    back = "⬅️ Назад" if lang == "ru" else "⬅️ Back"
+    cancel = "🛑 Отмена" if lang == "ru" else "🛑 Cancel"
+    help_text = "❓ Помощь" if lang == "ru" else "❓ Help"
+    return [
+        InlineKeyboardButton(text=back, callback_data="onb:nav:back"),
+        InlineKeyboardButton(text=cancel, callback_data="onb:nav:cancel"),
+        InlineKeyboardButton(text=help_text, callback_data="onb:nav:help"),
+    ]
+
+
+def _kb(rows: list[list[InlineKeyboardButton]], lang: str) -> InlineKeyboardMarkup:
+    rows = list(rows)
+    rows.append(_nav_row(lang))
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _question_text(step: str, lang: str) -> str:
+    if lang == "ru":
+        prompts = {
+            "s1_ready": "Привет. За 20 минут пройдем 8 шагов и соберем System Prompt в твоем голосе. Готов начать?",
+            "s2_about": "Расскажи в 1-2 предложениях кто ты и чем занимаешься.",
+            "s2_audience": "Кому ты пишешь? Опиши конкретного человека: возраст, занятие, боль.",
+            "s2_platforms": "Где публикуешься или планируешь публиковаться? Назови все и основную платформу.",
+            "s2_reader_feel": "Что должен почувствовать читатель после поста?",
+            "s2_avoid_topics": "Каких тем или форматов ты точно избегаешь?",
+            "s3_samples": "Скинь 3-5 любимых постов: свои, чужие или микс. Можешь отправлять текст, форвард или ссылку.",
+            "s4_intro": "Стиль — половина голоса. Вторая половина — что у тебя в голове. 4 быстрых вопроса.",
+            "s4_beliefs": "Назови 2-3 убеждения в твоей сфере, которые ты считаешь верными, а мейнстрим — нет.",
+            "s4_contradictions": "Какие внутренние противоречия ты иногда проговариваешь вслух?",
+            "s4_boundaries": "О чем ты не пишешь публично, даже если есть мысли?",
+            "s4_evolution": "Как изменились твои взгляды за последние 1-2 года?",
+            "s5_intro": "Финальный смысловой слой. Два коротких вопроса.",
+            "s5_reader_phrase": "Какую одну фразу сказал бы идеальный читатель после твоего поста?",
+            "s5_voice_betrayal": "Какой пост ты не назвал бы своим, даже если он вирусный?",
+            "toggle_warning": (
+                "Внимание: включение web_research и review_agent может увеличить расход AI-токенов и стоимость. "
+                "Можешь изменить это позже в /profile или /settings."
+            ),
+            "toggle_research": "Включить web research по умолчанию для новых сессий?",
+            "toggle_review": "Включить review-agent по умолчанию для черновиков?",
+        }
+    else:
+        prompts = {
+            "s1_ready": "Hi. In ~20 minutes we will pass 8 steps and produce a System Prompt in your voice. Ready to start?",
+            "s2_about": "In 1-2 sentences, who are you and what do you do?",
+            "s2_audience": "Who do you write for? Describe one concrete person: age, role, pain.",
+            "s2_platforms": "Where do you publish or plan to publish? List all and mark the main one.",
+            "s2_reader_feel": "What should the reader feel after your post?",
+            "s2_avoid_topics": "What topics or formats do you explicitly avoid?",
+            "s3_samples": "Send 3-5 favorite posts: yours, others, or mix. Text, forward, or link is fine.",
+            "s4_intro": "Style is half of voice. The other half is what is in your head. 4 quick questions.",
+            "s4_beliefs": "Name 2-3 contrarian beliefs in your domain.",
+            "s4_contradictions": "What inner contradictions do you sometimes say out loud?",
+            "s4_boundaries": "What do you avoid discussing publicly?",
+            "s4_evolution": "How did your view evolve in the last 1-2 years?",
+            "s5_intro": "Final semantic layer. Two short questions.",
+            "s5_reader_phrase": "What single phrase should the ideal reader say after reading your post?",
+            "s5_voice_betrayal": "What post would you call voice betrayal even if it went viral?",
+            "toggle_warning": (
+                "Warning: enabling web_research and review_agent may increase AI token usage and cost. "
+                "You can switch both later in /profile or /settings."
+            ),
+            "toggle_research": "Enable web research by default for new sessions?",
+            "toggle_review": "Enable review-agent by default for drafts?",
+        }
+    return prompts[step]
+
+
+def _goal_kb(lang: str, selected: set[str]) -> InlineKeyboardMarkup:
+    labels = (
+        [("a", "продавать продукт/услугу"), ("b", "собирать комьюнити"), ("c", "строить личный бренд"), ("d", "партнеры и нетворк"), ("e", "другое")]
+        if lang == "ru"
+        else [("a", "sell product/service"), ("b", "build community"), ("c", "build personal brand"), ("d", "find partners/network"), ("e", "other")]
+    )
+    rows: list[list[InlineKeyboardButton]] = []
+    for key, label in labels:
+        mark = "✅ " if key in selected else ""
+        rows.append([InlineKeyboardButton(text=f"{mark}{key}) {label}", callback_data=f"onb:goal:{key}")])
+    done_text = "Готово" if lang == "ru" else "Done"
+    rows.append([InlineKeyboardButton(text=done_text, callback_data="onb:goal:done")])
+    return _kb(rows, lang)
+
+
+def _binary_kb(prefix: str, lang: str) -> InlineKeyboardMarkup:
+    yes = "Да" if lang == "ru" else "Yes"
+    no = "Нет" if lang == "ru" else "No"
+    return _kb(
+        [
+            [InlineKeyboardButton(text=yes, callback_data=f"{prefix}:yes")],
+            [InlineKeyboardButton(text=no, callback_data=f"{prefix}:no")],
+        ],
+        lang,
+    )
+
+
+def _confirm_kb(kind: str, lang: str) -> InlineKeyboardMarkup:
+    if lang == "ru":
+        ok, edit, next_text = "Похоже", "Редактировать поле", "Дальше"
+    else:
+        ok, edit, next_text = "Looks right", "Edit field", "Continue"
+    return _kb(
+        [
+            [InlineKeyboardButton(text=ok, callback_data=f"onb:{kind}:ok")],
+            [InlineKeyboardButton(text=edit, callback_data=f"onb:{kind}:edit")],
+            [InlineKeyboardButton(text=next_text, callback_data=f"onb:{kind}:next")],
+        ],
+        lang,
+    )
+
+
+def _edit_field_kb(lang: str) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(text=f.label(lang), callback_data=f"onb:edit:{f.key}")]
+        for f in EDITABLE_FIELDS
+    ]
+    return _kb(rows, lang)
+
+
+async def _send_prompt(target: Message, state: FSMContext, lang: str, step: str) -> None:
+    await state.update_data(current_step=step)
+    if step == "s2_goals":
+        selected = set((await state.get_data()).get("goal_selected", []))
+        text = (
+            "Зачем тебе контент? Можно выбрать несколько и нажать «Готово»."
+            if lang == "ru"
+            else "Why do you need content now? You can select multiple and press Done."
+        )
+        await target.answer(text, reply_markup=_goal_kb(lang, selected))
+        return
+    if step == "s1_ready":
+        await target.answer(_question_text(step, lang), reply_markup=_binary_kb("onb:ready", lang))
+        return
+    if step == "s3_samples":
+        analyze = "Анализировать образцы" if lang == "ru" else "Analyze samples"
+        skip = "Пропустить пока" if lang == "ru" else "Skip for now"
+        await target.answer(
+            _question_text(step, lang),
+            reply_markup=_kb(
+                [
+                    [InlineKeyboardButton(text=analyze, callback_data="onb:sample:analyze")],
+                    [InlineKeyboardButton(text=skip, callback_data="onb:sample:skip")],
+                ],
+                lang,
+            ),
+        )
+        return
+    if step == "toggle_research":
+        await target.answer(_question_text("toggle_warning", lang))
+        await target.answer(_question_text(step, lang), reply_markup=_binary_kb("onb:toggle:web", lang))
+        return
+    if step == "toggle_review":
+        await target.answer(_question_text(step, lang), reply_markup=_binary_kb("onb:toggle:review", lang))
+        return
+    await target.answer(_question_text(step, lang), reply_markup=_kb([], lang))
+
+
+def _next_step(step: str) -> str | None:
+    flow = [
+        "s1_ready",
+        "s2_about",
+        "s2_audience",
+        "s2_platforms",
+        "s2_goals",
+        "s2_reader_feel",
+        "s2_avoid_topics",
+        "s2_confirm",
+        "s3_samples",
+        "s3_confirm",
+        "s4_beliefs",
+        "s4_contradictions",
+        "s4_boundaries",
+        "s4_evolution",
+        "s4_confirm",
+        "s5_reader_phrase",
+        "s5_voice_betrayal",
+        "s6_confirm",
+        "toggle_research",
+        "toggle_review",
+        "done",
+    ]
+    idx = flow.index(step)
+    if idx + 1 >= len(flow):
+        return None
+    return flow[idx + 1]
+
+
+def _save_text_key(step: str) -> str | None:
+    return {
+        "s2_about": "s2_about",
+        "s2_audience": "s2_audience",
+        "s2_platforms": "s2_platforms",
+        "s2_reader_feel": "s2_reader_feel",
+        "s2_avoid_topics": "s2_avoid_topics",
+        "s4_beliefs": "s4_beliefs",
+        "s4_contradictions": "s4_contradictions",
+        "s4_boundaries": "s4_boundaries",
+        "s4_evolution": "s4_evolution",
+        "s5_reader_phrase": "s5_reader_phrase",
+        "s5_voice_betrayal": "s5_voice_betrayal",
+    }.get(step)
+
+
+async def _persist_answer(uid: int, key: str, value: str, option_index: int | None = None) -> None:
     async with session_scope() as session:
-        answered = await get_answered_keys(session, uid)
-        required = {q.key for q in load_questions()}
-        fsm = await state.get_data()
+        await save_answer(
+            session,
+            uid,
+            key,
+            value,
+            option_index=option_index,
+            is_custom=option_index is None,
+        )
 
-        if fsm.get("edit_key"):
-            await apply_creator_preferences(session, uid)
-            await mark_profile_ready(session, uid)
-            await state.clear()
-            text = t("profile_updated", lang)
-            if isinstance(event, CallbackQuery):
-                await event.message.answer(text)  # type: ignore[union-attr]
-            else:
-                await event.answer(text)
-            return
 
-        if required.issubset(answered):
-            await finish_onboarding_handoff(event, lang=lang, uid=uid, state=state)
-            return
+async def _show_confirm_blocks(message: Message, state: FSMContext, step: str, lang: str) -> None:
+    fsm = await state.get_data()
+    answers = fsm.get("answers", {})
+    if step == "s2_confirm":
+        text = build_s2_summary(answers, lang)
+        help_text = (
+            "Похоже на тебя? Нажми «Похоже» или «Дальше». Для точечной правки — «Редактировать поле» или напиши правку сообщением."
+            if lang == "ru"
+            else "Does this fit you? Press Looks right or Continue. For targeted changes use Edit field or send free-text correction."
+        )
+    elif step == "s3_confirm":
+        text = f"ТВОЙ STYLE CARD\n\n{fsm.get('style_card_text', '')}" if lang == "ru" else f"YOUR STYLE CARD\n\n{fsm.get('style_card_text', '')}"
+        help_text = (
+            "Похоже на тебя? Можно идти дальше или прислать правки текстом."
+            if lang == "ru"
+            else "Does this match you? Continue or send correction text."
+        )
+    elif step == "s4_confirm":
+        text = fsm.get("values_block_text", "")
+        help_text = "Это про тебя?" if lang == "ru" else "Is this about you?"
+    else:
+        text = fsm.get("system_prompt_text", "")
+        help_text = (
+            "Готово. Сохранить и переходить к настройкам?"
+            if lang == "ru"
+            else "Done. Save and move to settings toggles?"
+        )
+    await message.answer(text)
+    await message.answer(help_text, reply_markup=_confirm_kb(step, lang))
 
-    await state.set_state(OnboardingStates.in_progress)
-    await show_question(event, lang=lang, state=state)
+
+async def _finish_onboarding(message: Message, state: FSMContext, uid: int, lang: str) -> None:
+    fsm = await state.get_data()
+    async with session_scope() as session:
+        await apply_creator_preferences(session, uid)
+        await save_profile_artifacts(
+            session,
+            uid,
+            style_card_text=fsm.get("style_card_text", ""),
+            values_block_text=fsm.get("values_block_text", ""),
+            tribal_block_text=fsm.get("tribal_block_text", ""),
+            system_prompt_text=fsm.get("system_prompt_text", ""),
+        )
+        await mark_profile_ready(session, uid)
+    done_text = (
+        "Онбординг завершен. Профиль готов. Дальше подключи каналы и переходи в /new."
+        if lang == "ru"
+        else "Onboarding complete. Profile is ready. Connect channels and continue in /new."
+    )
+    await message.answer(done_text)
+    await send_providers_screen(message, lang=lang, uid=uid, show_skip=True)
+    await state.clear()
+
+
+async def _fetch_link_sample(url: str) -> str | None:
+    try:
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+            response = await client.get(url)
+            if response.status_code >= 400:
+                return None
+            html = response.text
+            text = re.sub(r"<[^>]+>", " ", html)
+            text = re.sub(r"\\s+", " ", text).strip()
+            if len(text) < 120:
+                return None
+            return text[:4000]
+    except Exception:
+        return None
 
 
 @router.message(Command("onboarding"))
 async def cmd_onboarding(message: Message, state: FSMContext, **data) -> None:
     if not message.from_user:
         return
-    lang = await _lang(message, data)
+    uid = message.from_user.id
+    lang = _lang(data)
     async with session_scope() as session:
         await ensure_creator(
             session,
-            telegram_user_id=message.from_user.id,
+            telegram_user_id=uid,
             language_code=message.from_user.language_code,
         )
     await state.set_state(OnboardingStates.in_progress)
-    await state.update_data(edit_key=None)
-    await show_question(message, lang=lang, state=state)
+    fsm = await state.get_data()
+    step = fsm.get("current_step")
+    if step:
+        await _send_prompt(message, state, lang, step)
+        return
+    await state.update_data(
+        current_step="s1_ready",
+        flow_stack=[],
+        answers={},
+        goal_selected=[],
+        samples=[],
+        pending_edit_key=None,
+    )
+    await _send_prompt(message, state, lang, "s1_ready")
 
 
-@router.callback_query(F.data.startswith("ob:"))
-async def on_option(callback: CallbackQuery, state: FSMContext, **data) -> None:
-    if not callback.from_user or not callback.data:
+@router.callback_query(OnboardingStates.in_progress, F.data.startswith("onb:"))
+async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **data) -> None:
+    if not callback.from_user or not callback.data or not callback.message:
         return
-    lang = await _lang(callback, data)
-    parts = callback.data.split(":")
-    if len(parts) != 3:
-        await callback.answer()
-        return
-    _, key, choice = parts
-    q = get_question(key)
-    if q is None:
-        await callback.answer()
-        return
-
-    idx = int(choice)
-    label = q.option_label(lang, idx)
     uid = callback.from_user.id
-    async with session_scope() as session:
-        await save_answer(session, uid, key, label, idx, False)
+    lang = _lang(data)
+    fsm = await state.get_data()
+    parts = callback.data.split(":")
+    if len(parts) < 3:
+        await callback.answer()
+        return
 
-    await _after_answer(callback, state, lang=lang, uid=uid)
+    if parts[1] == "nav":
+        action = parts[2]
+        if action == "cancel":
+            await state.clear()
+            await callback.message.answer("Онбординг отменен." if lang == "ru" else "Onboarding cancelled.")
+            await callback.answer()
+            return
+        if action == "help":
+            text = (
+                "Правила: один вопрос за раз. Используй кнопки; можешь отвечать текстом. Назад возвращает на прошлый шаг."
+                if lang == "ru"
+                else "Rules: one question at a time. Use buttons and text replies. Back returns to previous step."
+            )
+            await callback.message.answer(text)
+            await callback.answer()
+            return
+        if action == "back":
+            stack = list(fsm.get("flow_stack", []))
+            if stack:
+                prev = stack.pop()
+                await state.update_data(flow_stack=stack, current_step=prev)
+                await _send_prompt(callback.message, state, lang, prev)
+            await callback.answer()
+            return
+
+    if parts[1] == "ready":
+        if parts[2] == "yes":
+            await state.update_data(flow_stack=["s1_ready"], current_step="s2_about")
+            await _send_prompt(callback.message, state, lang, "s2_about")
+        else:
+            await callback.message.answer("Напиши «да», когда будешь готов." if lang == "ru" else "Send 'yes' when ready.")
+        await callback.answer()
+        return
+
+    if parts[1] == "goal":
+        selected = set(fsm.get("goal_selected", []))
+        key = parts[2]
+        if key == "done":
+            if not selected:
+                await callback.answer("Выбери хотя бы 1 цель." if lang == "ru" else "Pick at least one goal.", show_alert=True)
+                return
+            goal_text = ", ".join(sorted(selected))
+            answers = dict(fsm.get("answers", {}))
+            answers["s2_goals"] = goal_text
+            await state.update_data(answers=answers)
+            await _persist_answer(uid, "s2_goals", goal_text, None)
+            if "e" in selected:
+                await callback.message.answer("Опиши «другое» коротко." if lang == "ru" else "Describe your 'other' goal briefly.")
+                await callback.answer()
+                return
+            await state.update_data(flow_stack=list(fsm.get("flow_stack", [])) + ["s2_goals"], current_step="s2_reader_feel")
+            await _send_prompt(callback.message, state, lang, "s2_reader_feel")
+            await callback.answer()
+            return
+        if key in selected:
+            selected.remove(key)
+        else:
+            selected.add(key)
+        await state.update_data(goal_selected=sorted(selected))
+        await callback.message.edit_reply_markup(reply_markup=_goal_kb(lang, selected))
+        await callback.answer()
+        return
+
+    if parts[1] == "sample":
+        if parts[2] == "skip":
+            style_card = build_style_card([], lang)
+            await state.update_data(style_card_text=style_card, current_step="s3_confirm", flow_stack=list(fsm.get("flow_stack", [])) + ["s3_samples"])
+            await _show_confirm_blocks(callback.message, state, "s3_confirm", lang)
+            await callback.answer()
+            return
+        if parts[2] == "analyze":
+            samples = list(fsm.get("samples", []))
+            style_card = build_style_card(samples, lang)
+            await state.update_data(style_card_text=style_card, current_step="s3_confirm", flow_stack=list(fsm.get("flow_stack", [])) + ["s3_samples"])
+            await _show_confirm_blocks(callback.message, state, "s3_confirm", lang)
+            await callback.answer()
+            return
+
+    if parts[1] in {"s2_confirm", "s3_confirm", "s4_confirm", "s6_confirm"}:
+        action = parts[2]
+        if action == "edit":
+            await callback.message.answer(
+                "Выбери поле для правки или отправь корректировку текстом."
+                if lang == "ru"
+                else "Choose a field to edit or send correction text.",
+                reply_markup=_edit_field_kb(lang),
+            )
+            await callback.answer()
+            return
+        if action in {"ok", "next"}:
+            next_step = _next_step(parts[1])
+            if next_step is None:
+                await callback.answer()
+                return
+            if next_step == "s4_beliefs":
+                await callback.message.answer(_question_text("s4_intro", lang))
+            if next_step == "s5_reader_phrase":
+                await callback.message.answer(_question_text("s5_intro", lang))
+            if next_step == "done":
+                await _finish_onboarding(callback.message, state, uid, lang)
+                await callback.answer()
+                return
+            await state.update_data(current_step=next_step, flow_stack=list(fsm.get("flow_stack", [])) + [parts[1]])
+            if next_step in {"s4_confirm", "s6_confirm"}:
+                await _show_confirm_blocks(callback.message, state, next_step, lang)
+            else:
+                await _send_prompt(callback.message, state, lang, next_step)
+            await callback.answer()
+            return
+
+    if parts[1] == "edit" and len(parts) == 3:
+        edit_key = parts[2]
+        await state.update_data(current_step=edit_key, pending_edit_key=edit_key)
+        await _send_prompt(callback.message, state, lang, edit_key)
+        await callback.answer()
+        return
+
+    if parts[1] == "toggle" and len(parts) == 4:
+        toggle_kind = parts[2]
+        value = parts[3]
+        yes = 0 if value == "yes" else 1
+        key = "web_research" if toggle_kind == "web" else "review_agent"
+        text = "Yes" if value == "yes" else "No"
+        await _persist_answer(uid, key, text, yes)
+        if key == "web_research":
+            await state.update_data(current_step="toggle_review", flow_stack=list(fsm.get("flow_stack", [])) + ["toggle_research"])
+            await _send_prompt(callback.message, state, lang, "toggle_review")
+        else:
+            await state.update_data(current_step="done")
+            await _finish_onboarding(callback.message, state, uid, lang)
+        await callback.answer()
+        return
+
     await callback.answer()
 
 
 @router.message(OnboardingStates.in_progress, F.text, ~F.text.startswith("/"))
-async def on_text_answer(message: Message, state: FSMContext, **data) -> None:
+async def on_onboarding_text(message: Message, state: FSMContext, **data) -> None:
     if not message.from_user or not message.text:
         return
-    lang = await _lang(message, data)
-    fsm = await state.get_data()
-    key = fsm.get("current_question_key")
-    if not key:
-        return
-
-    q = get_question(key)
-    if q is None:
-        return
-
-    parsed = parse_text_answer(q, lang, message.text)
-    if parsed is None:
-        return
-
-    label, idx, is_custom = parsed
+    lang = _lang(data)
     uid = message.from_user.id
-    async with session_scope() as session:
-        await save_answer(session, uid, key, label, idx, is_custom)
+    text = message.text.strip()
+    fsm = await state.get_data()
+    step = fsm.get("current_step")
+    if not step:
+        return
 
-    await _after_answer(message, state, lang=lang, uid=uid)
+    if step == "s1_ready":
+        if text.lower() in _yes_set(lang):
+            await state.update_data(current_step="s2_about", flow_stack=["s1_ready"])
+            await _send_prompt(message, state, lang, "s2_about")
+        return
+
+    if step == "s3_samples":
+        samples = list(fsm.get("samples", []))
+        url = extract_first_url(text)
+        if url:
+            fetched = await _fetch_link_sample(url)
+            if not fetched:
+                warn = "Не удалось прочитать ссылку. Вставь текст поста вручную." if lang == "ru" else "Could not fetch link. Paste post text manually."
+                await message.answer(warn)
+                return
+            samples.append(fetched)
+        else:
+            samples.append(text)
+        await state.update_data(samples=samples)
+        ack = f"Образец сохранен ({len(samples)})." if lang == "ru" else f"Sample saved ({len(samples)})."
+        await message.answer(ack)
+        return
+
+    if step == "s2_goals" and "e" in set(fsm.get("goal_selected", [])):
+        answers = dict(fsm.get("answers", {}))
+        merged = f"{answers.get('s2_goals', '')}; other: {text}".strip("; ")
+        answers["s2_goals"] = merged
+        await state.update_data(answers=answers)
+        await _persist_answer(uid, "s2_goals", merged, None)
+        await state.update_data(current_step="s2_reader_feel", flow_stack=list(fsm.get("flow_stack", [])) + ["s2_goals"])
+        await _send_prompt(message, state, lang, "s2_reader_feel")
+        return
+
+    if step in {"s2_confirm", "s3_confirm", "s4_confirm", "s6_confirm"}:
+        await message.answer("Правка сохранена. Можем идти дальше." if lang == "ru" else "Correction saved. We can continue.")
+        return
+
+    key = _save_text_key(step)
+    if key:
+        answers = dict(fsm.get("answers", {}))
+        answers[key] = text
+        await state.update_data(answers=answers)
+        await _persist_answer(uid, key, text, None)
+        pending_edit = fsm.get("pending_edit_key")
+        if pending_edit:
+            await state.update_data(current_step="s2_confirm", pending_edit_key=None)
+            await _show_confirm_blocks(message, state, "s2_confirm", lang)
+            return
+        next_step = _next_step(step)
+        if next_step == "s2_confirm":
+            await state.update_data(current_step="s2_confirm", flow_stack=list(fsm.get("flow_stack", [])) + [step])
+            await _show_confirm_blocks(message, state, "s2_confirm", lang)
+            return
+        if next_step == "s4_confirm":
+            values_block = build_values_block(answers, lang)
+            await state.update_data(values_block_text=values_block, current_step="s4_confirm", flow_stack=list(fsm.get("flow_stack", [])) + [step])
+            await _show_confirm_blocks(message, state, "s4_confirm", lang)
+            return
+        if next_step == "s6_confirm":
+            style = fsm.get("style_card_text", build_style_card([], lang))
+            values = fsm.get("values_block_text", build_values_block(answers, lang))
+            tribal = build_tribal_block(answers, lang)
+            system_prompt = build_system_prompt(answers, style, values, tribal)
+            await state.update_data(
+                tribal_block_text=tribal,
+                system_prompt_text=system_prompt,
+                current_step="s6_confirm",
+                flow_stack=list(fsm.get("flow_stack", [])) + [step],
+            )
+            await _show_confirm_blocks(message, state, "s6_confirm", lang)
+            return
+        if next_step:
+            if next_step == "s4_beliefs":
+                await message.answer(_question_text("s4_intro", lang))
+            if next_step == "s5_reader_phrase":
+                await message.answer(_question_text("s5_intro", lang))
+            await state.update_data(current_step=next_step, flow_stack=list(fsm.get("flow_stack", [])) + [step])
+            await _send_prompt(message, state, lang, next_step)

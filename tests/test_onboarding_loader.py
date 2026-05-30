@@ -1,14 +1,15 @@
-from content_factory_bot.onboarding.loader import load_questions
+from content_factory_bot.services.onboarding_engine import ordered_profile_keys, required_answer_keys
 
 
-def test_load_questions_returns_fourteen() -> None:
-    questions = load_questions()
-    assert len(questions) == 14
-    assert questions[0].key == "primary_language"
-    assert questions[-1].key == "review_agent"
+def test_required_answers_include_toggles() -> None:
+    required = required_answer_keys()
+    assert "web_research" in required
+    assert "review_agent" in required
+    assert "s2_about" in required
+    assert "s5_voice_betrayal" in required
 
 
-def test_occupation_question_prompt() -> None:
-    q = load_questions()[1]
-    assert q.key == "occupation"
-    assert "do" in q.prompt("en").lower() or "занимаетесь" in q.prompt("ru").lower()
+def test_ordered_profile_keys_stable() -> None:
+    keys = ordered_profile_keys()
+    assert keys[0] == "s2_about"
+    assert keys[-1] == "review_agent"

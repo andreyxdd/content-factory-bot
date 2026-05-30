@@ -4,7 +4,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from content_factory_bot.db.models import Base, ProviderConnection, ProviderKind
 from content_factory_bot.services.publish.adapters import (
     InstagramPublishAdapter,
-    LinkedInPublishAdapter,
     TelegramPublishAdapter,
 )
 

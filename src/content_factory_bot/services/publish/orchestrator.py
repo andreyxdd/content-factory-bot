@@ -8,7 +8,7 @@ from aiogram import Bot
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from content_factory_bot.db.models import ContentSession, ProviderConnection, ProviderKind, PublishedArtifact
+from content_factory_bot.db.models import ContentSession, ProviderConnection, PublishedArtifact
 from content_factory_bot.services.publish.adapters import AdapterResult, get_adapter
 
 logger = logging.getLogger(__name__)
