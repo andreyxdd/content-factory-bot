@@ -24,6 +24,7 @@ from content_factory_bot.services.onboarding_engine import (
 )
 from content_factory_bot.services.profile import (
     apply_creator_preferences,
+    get_profile_answers_map,
     mark_profile_ready,
     save_answer,
     save_profile_artifacts,
@@ -34,6 +35,38 @@ router = Router(name="onboarding")
 
 class OnboardingStates(StatesGroup):
     in_progress = State()
+
+
+TEXT_STEP_BY_KEY = {
+    "s2_about": "s2_about",
+    "s2_audience": "s2_audience",
+    "s2_platforms": "s2_platforms",
+    "s2_reader_feel": "s2_reader_feel",
+    "s2_avoid_topics": "s2_avoid_topics",
+    "s4_beliefs": "s4_beliefs",
+    "s4_contradictions": "s4_contradictions",
+    "s4_boundaries": "s4_boundaries",
+    "s4_evolution": "s4_evolution",
+    "s5_reader_phrase": "s5_reader_phrase",
+    "s5_voice_betrayal": "s5_voice_betrayal",
+}
+
+RESUME_STEP_ORDER = (
+    ("s2_about", "s2_about"),
+    ("s2_audience", "s2_audience"),
+    ("s2_platforms", "s2_platforms"),
+    ("s2_goals", "s2_goals"),
+    ("s2_reader_feel", "s2_reader_feel"),
+    ("s2_avoid_topics", "s2_avoid_topics"),
+    ("s4_beliefs", "s4_beliefs"),
+    ("s4_contradictions", "s4_contradictions"),
+    ("s4_boundaries", "s4_boundaries"),
+    ("s4_evolution", "s4_evolution"),
+    ("s5_reader_phrase", "s5_reader_phrase"),
+    ("s5_voice_betrayal", "s5_voice_betrayal"),
+    ("web_research", "toggle_research"),
+    ("review_agent", "toggle_review"),
+)
 
 
 def _lang(data: dict) -> str:
@@ -306,19 +339,25 @@ def _next_step(step: str) -> str | None:
 
 
 def _save_text_key(step: str) -> str | None:
-    return {
-        "s2_about": "s2_about",
-        "s2_audience": "s2_audience",
-        "s2_platforms": "s2_platforms",
-        "s2_reader_feel": "s2_reader_feel",
-        "s2_avoid_topics": "s2_avoid_topics",
-        "s4_beliefs": "s4_beliefs",
-        "s4_contradictions": "s4_contradictions",
-        "s4_boundaries": "s4_boundaries",
-        "s4_evolution": "s4_evolution",
-        "s5_reader_phrase": "s5_reader_phrase",
-        "s5_voice_betrayal": "s5_voice_betrayal",
-    }.get(step)
+    return TEXT_STEP_BY_KEY.get(step)
+
+
+def _resume_step_from_answers(answers: dict[str, str]) -> str:
+    answered = set(answers.keys())
+    for key, step in RESUME_STEP_ORDER:
+        if key not in answered:
+            return step
+    return "s6_confirm"
+
+
+def _goal_selection_from_answer(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    selected: list[str] = []
+    for token in re.findall(r"\b([abcde])\b", raw.lower()):
+        if token not in selected:
+            selected.append(token)
+    return selected
 
 
 async def _persist_answer(uid: int, key: str, value: str, option_index: int | None = None) -> None:
@@ -420,6 +459,21 @@ async def cmd_onboarding(message: Message, state: FSMContext, **data) -> None:
     step = fsm.get("current_step")
     if step:
         await _send_prompt(message, state, lang, step)
+        return
+    async with session_scope() as session:
+        answers = await get_profile_answers_map(session, uid)
+    if answers:
+        resume_step = _resume_step_from_answers(answers)
+        await state.update_data(
+            current_step=resume_step,
+            flow_stack=[],
+            answers=answers,
+            goal_selected=_goal_selection_from_answer(answers.get("s2_goals")),
+            samples=[],
+            pending_edit_key=None,
+            pending_edit_confirm_step=None,
+        )
+        await _send_prompt(message, state, lang, resume_step)
         return
     await state.update_data(
         current_step="s1_ready",

@@ -48,6 +48,16 @@ async def get_answered_keys(session: AsyncSession, telegram_user_id: int) -> set
     return set(result.scalars().all())
 
 
+async def get_profile_answers_map(session: AsyncSession, telegram_user_id: int) -> dict[str, str]:
+    result = await session.execute(
+        select(ProfileAnswer.question_key, ProfileAnswer.answer_text).where(
+            ProfileAnswer.telegram_user_id == telegram_user_id
+        )
+    )
+    rows = result.all()
+    return {question_key: answer_text for question_key, answer_text in rows}
+
+
 async def is_profile_complete(session: AsyncSession, telegram_user_id: int) -> bool:
     answered = await get_answered_keys(session, telegram_user_id)
     required = required_answer_keys()
