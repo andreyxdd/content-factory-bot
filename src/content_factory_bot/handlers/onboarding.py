@@ -92,7 +92,7 @@ def _yes_set(lang: str) -> set[str]:
 
 def _nav_row(lang: str, *, include_back: bool = True, include_skip: bool = False) -> list[InlineKeyboardButton]:
     back = "⬅️ Назад" if lang == "ru" else "⬅️ Back"
-    cancel = "🛑 Выйти из онбординга" if lang == "ru" else "🛑 Quit onboarding"
+    cancel = "🛑 Выйти" if lang == "ru" else "🛑 Quit"
     help_text = "❓ Помощь" if lang == "ru" else "❓ Help"
     skip_text = "⏭️ Пропустить" if lang == "ru" else "⏭️ Skip"
     row = []
