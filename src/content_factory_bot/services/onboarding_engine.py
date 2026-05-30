@@ -54,6 +54,18 @@ EDITABLE_FIELDS = (
 )
 
 
+def editable_fields_for_confirm(confirm_step: str) -> tuple[EditField, ...]:
+    if confirm_step in {"s2_confirm", "s3_confirm"}:
+        allowed = set(S2_KEYS)
+    elif confirm_step == "s4_confirm":
+        allowed = set(S2_KEYS + S4_KEYS)
+    elif confirm_step == "s6_confirm":
+        allowed = set(S2_KEYS + S4_KEYS + S5_KEYS)
+    else:
+        allowed = {field.key for field in EDITABLE_FIELDS}
+    return tuple(field for field in EDITABLE_FIELDS if field.key in allowed)
+
+
 def required_answer_keys() -> set[str]:
     return set(S2_KEYS + S4_KEYS + S5_KEYS + TOGGLE_KEYS)
 

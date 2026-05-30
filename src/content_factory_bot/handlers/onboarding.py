@@ -14,12 +14,12 @@ from content_factory_bot.handlers.providers_screen import send_providers_screen
 from content_factory_bot.middleware.locale import UI_LANG_KEY
 from content_factory_bot.services.creators import ensure_creator
 from content_factory_bot.services.onboarding_engine import (
-    EDITABLE_FIELDS,
     build_s2_summary,
     build_style_card,
     build_system_prompt,
     build_tribal_block,
     build_values_block,
+    editable_fields_for_confirm,
     extract_first_url,
 )
 from content_factory_bot.services.profile import (
@@ -171,12 +171,67 @@ def _confirm_kb(kind: str, lang: str) -> InlineKeyboardMarkup:
     )
 
 
-def _edit_field_kb(lang: str) -> InlineKeyboardMarkup:
+def _confirm_edit_fork_kb(kind: str, lang: str) -> InlineKeyboardMarkup:
+    if lang == "ru":
+        edit_label = "Редактировать отвеченные поля"
+        continue_label = "Продолжить с оставшимися вопросами"
+    else:
+        edit_label = "Edit answered fields"
+        continue_label = "Continue with additional questions"
+    return _kb(
+        [
+            [InlineKeyboardButton(text=edit_label, callback_data=f"onb:{kind}:edit_fields")],
+            [InlineKeyboardButton(text=continue_label, callback_data=f"onb:{kind}:continue_questions")],
+        ],
+        lang,
+    )
+
+
+def _edit_field_kb(lang: str, confirm_step: str) -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton(text=f.label(lang), callback_data=f"onb:edit:{f.key}")]
-        for f in EDITABLE_FIELDS
+        for f in editable_fields_for_confirm(confirm_step)
     ]
     return _kb(rows, lang)
+
+
+async def _advance_from_confirm(message: Message, state: FSMContext, lang: str, uid: int, confirm_step: str, fsm: dict) -> None:
+    next_step = _next_step(confirm_step)
+    if next_step is None:
+        return
+    if next_step == "s4_beliefs":
+        await message.answer(_question_text("s4_intro", lang))
+    if next_step == "s5_reader_phrase":
+        await message.answer(_question_text("s5_intro", lang))
+    if next_step == "done":
+        await _finish_onboarding(message, state, uid, lang)
+        return
+    await state.update_data(current_step=next_step, flow_stack=list(fsm.get("flow_stack", [])) + [confirm_step])
+    if next_step in {"s4_confirm", "s6_confirm"}:
+        await _show_confirm_blocks(message, state, next_step, lang)
+    else:
+        await _send_prompt(message, state, lang, next_step)
+
+
+async def _return_to_confirm(message: Message, state: FSMContext, lang: str, confirm_step: str) -> None:
+    fsm = await state.get_data()
+    answers = fsm.get("answers", {})
+    updates: dict[str, str | None] = {
+        "current_step": confirm_step,
+        "pending_edit_key": None,
+        "pending_edit_confirm_step": None,
+    }
+    if confirm_step == "s4_confirm":
+        updates["values_block_text"] = build_values_block(answers, lang)
+    if confirm_step == "s6_confirm":
+        style = fsm.get("style_card_text", build_style_card([], lang))
+        values = build_values_block(answers, lang)
+        tribal = build_tribal_block(answers, lang)
+        updates["values_block_text"] = values
+        updates["tribal_block_text"] = tribal
+        updates["system_prompt_text"] = build_system_prompt(answers, style, values, tribal)
+    await state.update_data(**updates)
+    await _show_confirm_blocks(message, state, confirm_step, lang)
 
 
 async def _send_prompt(target: Message, state: FSMContext, lang: str, step: str) -> None:
@@ -373,6 +428,7 @@ async def cmd_onboarding(message: Message, state: FSMContext, **data) -> None:
         goal_selected=[],
         samples=[],
         pending_edit_key=None,
+        pending_edit_confirm_step=None,
     )
     await _send_prompt(message, state, lang, "s1_ready")
 
@@ -435,6 +491,12 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
             answers["s2_goals"] = goal_text
             await state.update_data(answers=answers)
             await _persist_answer(uid, "s2_goals", goal_text, None)
+            pending_edit = fsm.get("pending_edit_key")
+            pending_confirm = fsm.get("pending_edit_confirm_step")
+            if pending_edit == "s2_goals" and pending_confirm:
+                await _return_to_confirm(callback.message, state, lang, pending_confirm)
+                await callback.answer()
+                return
             if "e" in selected:
                 await callback.message.answer("Опиши «другое» коротко." if lang == "ru" else "Describe your 'other' goal briefly.")
                 await callback.answer()
@@ -470,38 +532,45 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
     if parts[1] in {"s2_confirm", "s3_confirm", "s4_confirm", "s6_confirm"}:
         action = parts[2]
         if action == "edit":
+            if parts[1] in {"s2_confirm", "s3_confirm", "s4_confirm"}:
+                await callback.message.answer(
+                    "Мы еще не прошли все вопросы профиля. Можешь отредактировать уже отвеченные поля или продолжить с оставшимися."
+                    if lang == "ru"
+                    else "We have not asked all profile questions yet. You can edit answered fields now or continue with additional questions.",
+                    reply_markup=_confirm_edit_fork_kb(parts[1], lang),
+                )
+            else:
+                await callback.message.answer(
+                    "Выбери поле для правки или отправь корректировку текстом."
+                    if lang == "ru"
+                    else "Choose a field to edit or send correction text.",
+                    reply_markup=_edit_field_kb(lang, parts[1]),
+                )
+            await callback.answer()
+            return
+        if action == "edit_fields":
+            await state.update_data(pending_edit_confirm_step=parts[1])
             await callback.message.answer(
                 "Выбери поле для правки или отправь корректировку текстом."
                 if lang == "ru"
                 else "Choose a field to edit or send correction text.",
-                reply_markup=_edit_field_kb(lang),
+                reply_markup=_edit_field_kb(lang, parts[1]),
             )
             await callback.answer()
             return
+        if action == "continue_questions":
+            await _advance_from_confirm(callback.message, state, lang, uid, parts[1], fsm)
+            await callback.answer()
+            return
         if action in {"ok", "next"}:
-            next_step = _next_step(parts[1])
-            if next_step is None:
-                await callback.answer()
-                return
-            if next_step == "s4_beliefs":
-                await callback.message.answer(_question_text("s4_intro", lang))
-            if next_step == "s5_reader_phrase":
-                await callback.message.answer(_question_text("s5_intro", lang))
-            if next_step == "done":
-                await _finish_onboarding(callback.message, state, uid, lang)
-                await callback.answer()
-                return
-            await state.update_data(current_step=next_step, flow_stack=list(fsm.get("flow_stack", [])) + [parts[1]])
-            if next_step in {"s4_confirm", "s6_confirm"}:
-                await _show_confirm_blocks(callback.message, state, next_step, lang)
-            else:
-                await _send_prompt(callback.message, state, lang, next_step)
+            await _advance_from_confirm(callback.message, state, lang, uid, parts[1], fsm)
             await callback.answer()
             return
 
     if parts[1] == "edit" and len(parts) == 3:
         edit_key = parts[2]
-        await state.update_data(current_step=edit_key, pending_edit_key=edit_key)
+        confirm_step = fsm.get("pending_edit_confirm_step", "s2_confirm")
+        await state.update_data(current_step=edit_key, pending_edit_key=edit_key, pending_edit_confirm_step=confirm_step)
         await _send_prompt(callback.message, state, lang, edit_key)
         await callback.answer()
         return
@@ -566,6 +635,11 @@ async def on_onboarding_text(message: Message, state: FSMContext, **data) -> Non
         answers["s2_goals"] = merged
         await state.update_data(answers=answers)
         await _persist_answer(uid, "s2_goals", merged, None)
+        pending_edit = fsm.get("pending_edit_key")
+        pending_confirm = fsm.get("pending_edit_confirm_step")
+        if pending_edit == "s2_goals" and pending_confirm:
+            await _return_to_confirm(message, state, lang, pending_confirm)
+            return
         await state.update_data(current_step="s2_reader_feel", flow_stack=list(fsm.get("flow_stack", [])) + ["s2_goals"])
         await _send_prompt(message, state, lang, "s2_reader_feel")
         return
@@ -582,8 +656,8 @@ async def on_onboarding_text(message: Message, state: FSMContext, **data) -> Non
         await _persist_answer(uid, key, text, None)
         pending_edit = fsm.get("pending_edit_key")
         if pending_edit:
-            await state.update_data(current_step="s2_confirm", pending_edit_key=None)
-            await _show_confirm_blocks(message, state, "s2_confirm", lang)
+            confirm_step = fsm.get("pending_edit_confirm_step", "s2_confirm")
+            await _return_to_confirm(message, state, lang, confirm_step)
             return
         next_step = _next_step(step)
         if next_step == "s2_confirm":
