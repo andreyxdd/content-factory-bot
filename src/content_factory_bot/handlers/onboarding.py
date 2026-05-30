@@ -152,6 +152,92 @@ def _question_text(step: str, lang: str) -> str:
     return prompts[step]
 
 
+def _help_text(step: str, lang: str) -> str:
+    key = step if step in {
+        "s1_ready",
+        "s2_about",
+        "s2_audience",
+        "s2_platforms",
+        "s2_goals",
+        "s2_reader_feel",
+        "s2_avoid_topics",
+        "s2_confirm",
+        "s3_samples",
+        "s3_confirm",
+        "s4_beliefs",
+        "s4_contradictions",
+        "s4_boundaries",
+        "s4_evolution",
+        "s4_confirm",
+        "s5_reader_phrase",
+        "s5_voice_betrayal",
+        "s6_confirm",
+        "toggle_research",
+        "toggle_review",
+    } else "fallback"
+    if lang == "ru":
+        texts = {
+            "s1_ready": "Коротко: онбординг собирает твой голос и настройки. Нажми «Продолжить», чтобы начать.",
+            "s2_about": "Кто ты и чем занимаешься сейчас. Пример: «Я product engineer, строю AI-инструменты для авторов».",
+            "s2_audience": "Опиши одного типичного читателя: роль, уровень, боль. Пример: «PM 28 лет, тонет в хаосе задач».",
+            "s2_platforms": "Где публикуешься и что главное. Пример: «Telegram и LinkedIn, основной канал — Telegram».",
+            "s2_goals": "Зачем тебе контент сейчас. Выбери несколько пунктов и нажми «Готово».",
+            "s2_reader_feel": "Какое чувство должен получить читатель. Пример: «Ясность, спокойствие и импульс действовать».",
+            "s2_avoid_topics": "Темы и форматы, которые ты не публикуешь. Пример: «Политика, токсичный хейт, кликбейт».",
+            "s2_confirm": "Проверь карточку. Можно: подтвердить, продолжить дальше, выбрать поле для правки или прислать правку текстом.",
+            "s3_samples": "Пришли 3-5 образцов: текст, форвард или ссылка. Когда хватит — «Анализировать образцы» или «Пропустить пока».",
+            "s3_confirm": "Это черновой style card по образцам. Если не похоже на тебя, напиши корректировку.",
+            "s4_beliefs": (
+                "2-3 убеждения, с которыми большинство в твоей сфере не согласится.\n\n"
+                "Пример (софт):\n"
+                "«MVP должен быть грубее и выходить за 3 дня».\n"
+                "«Большинству команд нужно меньше микросервисов, а не больше».\n"
+                "«Меньше сеньоров + сильный процесс лучше, чем раздутый штат»."
+            ),
+            "s4_contradictions": "Внутренние противоречия, которые ты признаешь вслух. Пример: «Я за баланс, но отвечаю в полночь».",
+            "s4_boundaries": "О чем принципиально не пишешь публично. Пример: «Семейные детали, чужие доходы, приватные конфликты».",
+            "s4_evolution": "Как твой взгляд изменился за 1-2 года. Пример: «Раньше гнался за охватом, теперь за качеством диалога».",
+            "s4_confirm": "Проверь блок ценностей. Если формулировка не твоя, поправь полем или текстом.",
+            "s5_reader_phrase": "Одна фраза, которую должен сказать идеальный читатель после поста. Пример: «Это прямо про меня».",
+            "s5_voice_betrayal": "Какой пост был бы «не твоим голосом», даже если вирусный. Пример: «Манипулятивный хайп без пользы».",
+            "s6_confirm": "Это собранный system prompt. Проверь и продолжай к финальным переключателям.",
+            "toggle_research": "Включает веб-исследование в новых сессиях по умолчанию. Можно менять позже в /profile или /settings.",
+            "toggle_review": "Включает review-agent для черновиков по умолчанию. Можно менять позже.",
+            "fallback": "Правила: один вопрос за раз. Можно нажимать кнопки или отвечать текстом. «Назад» возвращает к прошлому шагу.",
+        }
+    else:
+        texts = {
+            "s1_ready": "Short version: onboarding captures your voice and defaults. Press Continue to start.",
+            "s2_about": "Who you are and what you do now. Example: \"I am a product engineer building AI tools for creators.\"",
+            "s2_audience": "Describe one concrete reader: role, level, pain. Example: \"28-year-old PM drowning in task chaos.\"",
+            "s2_platforms": "Where you publish and which one is primary. Example: \"Telegram and LinkedIn; main channel is Telegram.\"",
+            "s2_goals": "Why you need content now. Select multiple options, then press Done.",
+            "s2_reader_feel": "What feeling the reader should leave with. Example: \"Clarity, relief, and motivation to act.\"",
+            "s2_avoid_topics": "Topics/formats you never publish. Example: \"Politics, rage-bait, manipulative clickbait.\"",
+            "s2_confirm": "Review your profile card. You can confirm, continue, edit a field, or send free-text correction.",
+            "s3_samples": "Send 3-5 samples: text, forward, or links. Then press Analyze samples or Skip for now.",
+            "s3_confirm": "This is a draft style card from your samples. If it misses your voice, send corrections.",
+            "s4_beliefs": (
+                "2-3 opinions you hold that most people in your field disagree with.\n\n"
+                "Example (software):\n"
+                "\"MVPs should be uglier and ship in 3 days.\"\n"
+                "\"Most teams should use fewer microservices, not more.\"\n"
+                "\"Hiring fewer seniors + better process beats big headcount.\""
+            ),
+            "s4_contradictions": "Beliefs or behaviors that conflict, but you admit openly. Example: \"I preach balance but reply at midnight.\"",
+            "s4_boundaries": "What you refuse to discuss publicly. Example: \"Family details, private conflicts, client secrets.\"",
+            "s4_evolution": "How your view changed in 1-2 years. Example: \"I used to chase reach; now I optimize for trust.\"",
+            "s4_confirm": "Review your values block. If wording is off, edit fields or send text corrections.",
+            "s5_reader_phrase": "One line your ideal reader should say after a post. Example: \"This finally put my thoughts in order.\"",
+            "s5_voice_betrayal": "What kind of post would betray your voice, even if viral. Example: \"Hypey manipulation with no substance.\"",
+            "s6_confirm": "This is your assembled system prompt. Review it, then continue to final toggles.",
+            "toggle_research": "Enables web research by default in new sessions. You can change this later in /profile or /settings.",
+            "toggle_review": "Enables review-agent by default for drafts. You can change this later.",
+            "fallback": "Rules: one question at a time. Use buttons or text replies. Back returns to the previous step.",
+        }
+    return texts[key]
+
+
 def _goal_kb(lang: str, selected: set[str]) -> InlineKeyboardMarkup:
     labels = (
         [("a", "продавать продукт/услугу"), ("b", "собирать комьюнити"), ("c", "строить личный бренд"), ("d", "партнеры и нетворк"), ("e", "другое")]
@@ -507,11 +593,7 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
             await callback.answer()
             return
         if action == "help":
-            text = (
-                "Правила: один вопрос за раз. Используй кнопки; можешь отвечать текстом. Назад возвращает на прошлый шаг."
-                if lang == "ru"
-                else "Rules: one question at a time. Use buttons and text replies. Back returns to previous step."
-            )
+            text = _help_text(fsm.get("current_step", "fallback"), lang)
             await callback.message.answer(text)
             await callback.answer()
             return
