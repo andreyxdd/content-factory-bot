@@ -47,6 +47,17 @@ OAUTH_STATE_SECRET=${OAUTH_SECRET}
 USE_WORKER=true
 CREDENTIALS_ENCRYPTION_KEY=${CRED_KEY}
 OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+LLM_BASE_URL=https://openrouter.ai/api/v1
+LLM_MODEL_RESEARCH=perplexity/sonar-pro
+LLM_MODEL_RESEARCH_FALLBACK=perplexity/sonar
+LLM_MODEL_DRAFT=anthropic/claude-sonnet-4
+LLM_MODEL_DRAFT_FALLBACK=openai/gpt-4o
+LLM_MODEL_FAST=google/gemini-2.5-flash
+LLM_MODEL_FAST_FALLBACK=openai/gpt-4o-mini
+LLM_MODEL_REVIEW=openai/gpt-4o
+LLM_MODEL_REVIEW_FALLBACK=anthropic/claude-sonnet-4
+LLM_MODEL_IMAGE=black-forest-labs/flux-1.1-pro
+LLM_MODEL_IMAGE_FALLBACK=openai/dall-e-3
 EOF
 chmod 600 "$APP_DIR/.env"
 echo "Wrote $APP_DIR/.env"

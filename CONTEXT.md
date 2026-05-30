@@ -136,6 +136,68 @@ _Avoid_: Cross-post, blast
 A record linking finalized content to provider post urls returned after successful publish.
 _Avoid_: Post result, delivery
 
+### Strategy (content plan)
+
+**Strategy Agent**:
+The product role that maintains a Creator's **content plan** and **content rubrics**, and proposes what to publish next and when — as suggestions the Creator approves. May factor **unpublished inventory** (when **strategy inventory preference** is on), e.g. nudge to publish **saved content** or finish a stalled **plan slot**. Does not publish or draft by itself; execution stays in **content session** or **publish from library**.
+_Avoid_: Strategy bot, planner subagent, editorial AI
+
+**Content rubric**:
+A named editorial column in the Creator's plan (e.g. Q&A, weekly insights, behind-the-scenes). Optional description; used to tag **plan slots** and balance variety over time. Distinct from onboarding **profile answers** (`formats`, `niche_topics`, `signature_themes`): those define voice and boundaries; rubrics define how the Creator buckets planned work. Bot may **propose** initial rubrics from the profile once; Creator edits in strategy UI.
+_Avoid_: Category tag, content pillar (unless you mean positioning, not columns), format (onboarding)
+
+**Content plan**:
+The Creator's forward-looking schedule of intended posts: a set of **plan slots**, each with topic, optional **content rubric**, and target publish time. Distinct from **content session** history (what was actually drafted and published).
+_Avoid_: Calendar, backlog (vague), content queue
+
+**Plan slot**:
+One row in the **content plan**: working title/topic, optional rubric, scheduled time (`scheduled_at`), and lifecycle status (planned, in progress, done, skipped). May link to **saved content** or a **content session**; may be created with topic only (**slot readiness** false until **saved content** attached). Linking paths: when creating/editing a slot, after **save** in a session, or from the strategy screen. Shows readiness (content attached vs topic-only). Becomes **done** when published, saved (if that fulfilled intent), or skipped. At `scheduled_at`, behavior depends on **auto-publish preference** (see below). If auto-publish is on but not ready, fire **slot reminder** instead of failing silently.
+_Avoid_: Task, ticket, scheduled post
+
+**Auto-publish preference**:
+Creator setting (default off): when on, the bot publishes linked **saved content** at the **plan slot**'s `scheduled_at` using **auto-publish destinations**. Only available after **setup complete**; hidden or disabled before then. When off, the bot sends a **slot reminder** instead. Requires **slot readiness** before the slot fires.
+_Avoid_: Autopost, cron mode
+
+**Slot reminder**:
+Telegram message at `scheduled_at` when **auto-publish preference** is off, or when auto-publish was due but **slot readiness** failed: shows slot title; actions **publish** (via **publish from library** if **saved content** linked, else **start from plan**), **skip**, **reschedule**. Strategy Agent may propose a new date in suggestions.
+_Avoid_: Notification, nudge
+
+**Slot readiness**:
+Whether a **plan slot** can auto-publish at `scheduled_at`: the slot is linked to **saved content** (final text present). If not ready when the slot fires, auto-publish does not run; Creator receives a **slot reminder** to prepare, **reschedule**, or **skip**. Unattended “topic-only” auto-draft is out of scope for v1.
+_Avoid_: Ready flag (implementation)
+
+**Auto-publish destinations**:
+Default **session destinations** used when **auto-publish preference** publishes **saved content** for a slot. Configured on the **strategy** screen; not inferred from the last session alone.
+_Avoid_: Default channels (vague)
+
+**Reschedule**:
+Creator moves a **plan slot**'s `scheduled_at` to a later time; status stays `planned` unless work already started.
+_Avoid_: Snooze (use only for short deferral if product distinguishes)
+
+**Saved content**:
+Final post text (and optional cover reference) persisted after a **content session** when the Creator chooses **save** instead of or before **publish**. Delivered in Telegram DM and stored for later list/copy/reuse. May later be **published from library** with optional edit and destination pick. Remains **saved** with linked **published artifact**(s) when published (not deleted). Distinct from in-session **draft option** (not final).
+_Avoid_: Draft (use **draft option** during session), export file (implementation detail)
+
+**Publish from library**:
+Publishing previously **saved content** without a full new **content session** draft loop; optional text edit and cover reuse before send.
+_Avoid_: Re-post, republish menu (vague)
+
+**Unpublished inventory**:
+What the **Strategy Agent** may read when **strategy inventory preference** is on: **saved content** without a **published artifact**, plus **plan slots** still `planned` or `in_progress` (including overdue). Excludes mid-session **draft options** and unconfirmed finals.
+_Avoid_: Backlog file, drafts folder
+
+**Strategy inventory preference**:
+Creator toggle on the **strategy** command screen (default on): include **unpublished inventory** in **strategy suggestions**. When off, suggestions use **content plan**, rubrics, and **personality profile** only.
+_Avoid_: Use saved posts toggle (implementation label)
+
+**Session completion**:
+Terminal outcome of a **content session**: **published** (≥1 **published artifact**), **saved** (**saved content** only), **closed** without save/publish (cancel/abandon), or failed publish with retry still open per provider rules. After draft confirm, **save** and **publish** are peer actions (same prominence); publish alone runs destination confirmation.
+_Avoid_: Done (ambiguous with plan slot status)
+
+**Strategy suggestion**:
+A proposed **plan slot** (or rubric) produced by the Strategy Agent for Creator approval. Inactive until the Creator adds it to the **content plan** — same trust model as **memory suggestion**. Should align with **personality profile** (especially niche and taboos); if a suggestion stretches niche, surface that in rationale — do not hard-block without Creator choice.
+_Avoid_: AI draft, recommendation (use **Recommendation** only for 3+1 menu picks)
+
 ### Integrations
 
 **Provider**:
@@ -181,6 +243,8 @@ _Avoid_: Publish intent (broader term), platforms
 | Telegram as provider | Creator already *is* on Telegram; "connect Telegram" unclear | **Provider** means publish target (channel/group), not the bot chat itself |
 | Telegram channel link | Forward alone proves ownership? | On forward, bot must be **admin** in that chat (`getChatMember`) before **provider connection** is saved |
 | Content Factory | OpenClaw doc implies scheduled multi-agent Discord pipeline | This bot implements **interactive** research/write/publish loops; scheduled overnight pipeline is out of MVP unless explicitly added |
+| Publish vs save | “Done” might mean only live on providers | Creator may **save** final text without **publish**; both count as fulfilling a linked **plan slot** |
+| Scheduled slot | MVP said interactive-only, no cron | **Auto-publish preference** enables unattended publish at `scheduled_at`; otherwise **slot reminder** with publish/skip/reschedule |
 
 ## Example dialogue
 
@@ -203,3 +267,11 @@ _Avoid_: Publish intent (broader term), platforms
 **Expert:** They connected Instagram but publish fails mid-way.
 
 **Dev:** Content session stays open; published artifacts record partial success per provider. Creator can retry publish intent without restarting `/new`.
+
+**Expert:** They want a content calendar but not every post goes out through the bot the same day.
+
+**Dev:** **Strategy Agent** holds **plan slots** and **content rubrics**. They can **save** final text without **publish**, then **publish from library** later. At `scheduled_at`, either **auto-publish** (if enabled and **slot readiness**) or a **slot reminder** with publish / skip / reschedule.
+
+**Expert:** Can they open `/strategy` before linking Telegram channel?
+
+**Dev:** Yes once **personality profile** is ready. **Auto-publish** waits until **setup complete**.
