@@ -14,6 +14,7 @@ from content_factory_bot.services.content_session import (
     set_session_title,
 )
 from content_factory_bot.services.draft import DraftOrchestrator
+from content_factory_bot.services.profile_artifacts import current_prompt_context
 from content_factory_bot.services.profile import format_profile_summary
 from content_factory_bot.services.research import ResearchStep
 
@@ -43,13 +44,19 @@ async def process_session_input(
     if row.title == "Untitled" and input_text:
         await set_session_title(db, row, await title_from_input(input_text))
 
-    profile = await format_profile_summary(db, uid, lang)
+    profile_summary = await format_profile_summary(db, uid, lang)
+    profile_context, _ = await current_prompt_context(
+        db,
+        telegram_user_id=uid,
+        locale=lang,
+        fallback_summary=profile_summary,
+    )
 
     if row.web_research:
         await set_session_state(db, row, "researching")
         step = research or ResearchStep()
         try:
-            brief = await step.run(profile_summary=profile, input_text=input_text)
+            brief = await step.run(profile_summary=profile_context, input_text=input_text)
         except Exception:
             logger.exception("research failed session=%s", row.id)
             brief = "(Research unavailable — continuing without brief.)"
@@ -60,7 +67,8 @@ async def process_session_input(
     await set_session_state(db, row, "drafting")
     orch = orchestrator or DraftOrchestrator()
     options = await orch.generate_initial_round(
-        profile_summary=profile,
+        profile_summary=profile_context,
+        content_language=lang,
         input_text=input_text,
         research_brief=row.research_brief or brief,
     )

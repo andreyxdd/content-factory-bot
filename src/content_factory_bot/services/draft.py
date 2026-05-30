@@ -94,12 +94,14 @@ class DraftOrchestrator:
         self,
         *,
         profile_summary: str,
+        content_language: str = "en",
         input_text: str,
         research_brief: str | None = None,
     ) -> list[str]:
         system = (
             "You are a personal content writer. Return JSON with exactly three "
-            "distinct draft options for the Creator's post. Match their profile tone."
+            "distinct draft options for the Creator's post. Match their profile tone. "
+            f"Write in language locale '{content_language}'."
         )
         parts = [
             f"<profile>\n{profile_summary}\n</profile>",
@@ -121,6 +123,7 @@ class DraftOrchestrator:
         self,
         *,
         profile_summary: str,
+        content_language: str = "en",
         input_text: str,
         prior_options: list[str],
         selected_index: int,
@@ -128,7 +131,7 @@ class DraftOrchestrator:
     ) -> list[str]:
         system = (
             "Generate three NEW draft options (not repeats). JSON schema with "
-            "options array of length 3."
+            f"options array of length 3. Write in language locale '{content_language}'."
         )
         selected = prior_options[selected_index]
         user = (
@@ -151,6 +154,7 @@ class DraftOrchestrator:
         self,
         *,
         profile_summary: str,
+        content_language: str = "en",
         input_text: str,
         selected_text: str,
         feedback: str | None,
@@ -158,7 +162,8 @@ class DraftOrchestrator:
         """Refinement: 1 edited + 2 new (returned as 3 options)."""
         system = (
             "Refine the selected draft and add two alternative angles. "
-            "Return JSON with exactly three options; first should be the refined main draft."
+            "Return JSON with exactly three options; first should be the refined main draft. "
+            f"Write in language locale '{content_language}'."
         )
         user = (
             f"<profile>\n{profile_summary}\n</profile>\n"

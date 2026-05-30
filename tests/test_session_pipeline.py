@@ -3,7 +3,13 @@ import json
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from content_factory_bot.db.models import Base, Creator, PersonalityProfile
+from content_factory_bot.db.models import (
+    Base,
+    Creator,
+    PersonalityProfile,
+    ProfileArtifactSet,
+    SupportedLocale,
+)
 from content_factory_bot.services.content_session import save_text_input, start_session
 from content_factory_bot.services.draft import DraftOrchestrator, StubChatClient
 from content_factory_bot.services.onboarding_engine import required_answer_keys
@@ -19,6 +25,8 @@ async def db_session() -> AsyncSession:
     factory = async_sessionmaker(engine, expire_on_commit=False)
     async with factory() as session:
         uid = 42
+        session.add(SupportedLocale(code="en", display_name="English", is_active=True, is_default=True))
+        session.add(SupportedLocale(code="ru", display_name="Russian", is_active=True, is_default=False))
         session.add(Creator(telegram_user_id=uid, primary_language="en"))
         session.add(PersonalityProfile(telegram_user_id=uid, ready=True))
         for key in required_answer_keys():
@@ -52,3 +60,33 @@ async def test_process_input_creates_draft_round(db_session: AsyncSession) -> No
     await db_session.refresh(row)
     assert row.state == "awaiting_draft_choice"
     assert row.title.startswith("Redis")
+
+
+@pytest.mark.asyncio
+async def test_process_input_prefers_localized_artifact_prompt(db_session: AsyncSession) -> None:
+    uid = 42
+    db_session.add(
+        ProfileArtifactSet(
+            telegram_user_id=uid,
+            locale="en",
+            profile_version=1,
+            status="active",
+            is_active=True,
+            style_card_text="style",
+            values_block_text="values",
+            tribal_block_text="tribal",
+            system_prompt_text="LOCALIZED_SYSTEM_PROMPT",
+        )
+    )
+    await db_session.commit()
+    row = await start_session(
+        db_session, uid, web_research=False, cover_generation=False
+    )
+    await save_text_input(db_session, row.id, "Edge compute founders")
+    stub = StubChatClient(json.dumps({"options": ["A", "B", "C"]}))
+    await process_session_input(
+        db_session,
+        row,
+        orchestrator=DraftOrchestrator(client=stub),
+    )
+    assert "LOCALIZED_SYSTEM_PROMPT" in stub.last_user_message

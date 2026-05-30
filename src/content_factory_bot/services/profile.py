@@ -2,6 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from content_factory_bot.db.models import Creator, PersonalityProfile, ProfileAnswer, PrimaryLanguage
+from content_factory_bot.services.profile_artifacts import activate_artifact_set
 from content_factory_bot.services.onboarding_engine import (
     ordered_profile_keys,
     required_answer_keys,
@@ -146,4 +147,16 @@ async def save_profile_artifacts(
     profile.values_block_text = values_block_text
     profile.tribal_block_text = tribal_block_text
     profile.system_prompt_text = system_prompt_text
+    creator = await session.get(Creator, telegram_user_id)
+    locale = creator.primary_language if creator else PrimaryLanguage.EN
+    await activate_artifact_set(
+        session,
+        telegram_user_id=telegram_user_id,
+        locale=locale,
+        profile_version=profile.profile_version,
+        style_card_text=style_card_text,
+        values_block_text=values_block_text,
+        tribal_block_text=tribal_block_text,
+        system_prompt_text=system_prompt_text,
+    )
     await session.commit()

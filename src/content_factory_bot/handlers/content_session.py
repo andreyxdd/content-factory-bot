@@ -36,6 +36,7 @@ from content_factory_bot.services.cover import CoverStep
 from content_factory_bot.services.draft import DraftOrchestrator
 from content_factory_bot.handlers.providers_screen import send_providers_screen
 from content_factory_bot.services.profile import format_profile_summary, is_profile_ready
+from content_factory_bot.services.profile_artifacts import current_prompt_context
 from content_factory_bot.services.providers import is_setup_complete, list_active_providers
 from content_factory_bot.services.publish import PublishOrchestrator
 from content_factory_bot.services.draft_delivery import deliver_draft_round
@@ -505,13 +506,20 @@ async def on_session_callback(callback: CallbackQuery, state: FSMContext, **data
                 return
             options = parse_options(dr)
             selected = options[dr.selected_index]
-            profile = await format_profile_summary(session, uid, lang)
+            profile_summary = await format_profile_summary(session, uid, lang)
+            profile, _ = await current_prompt_context(
+                session,
+                telegram_user_id=uid,
+                locale=lang,
+                fallback_summary=profile_summary,
+            )
             input_text = await aggregate_input_text(session, sid)
             orch = DraftOrchestrator()
 
             if action == "new":
                 new_opts = await orch.generate_follow_up_round(
                     profile_summary=profile,
+                    content_language=lang,
                     input_text=input_text,
                     prior_options=options,
                     selected_index=dr.selected_index,
@@ -527,6 +535,7 @@ async def on_session_callback(callback: CallbackQuery, state: FSMContext, **data
             elif action == "refine":
                 new_opts = await orch.refine_selected(
                     profile_summary=profile,
+                    content_language=lang,
                     input_text=input_text,
                     selected_text=selected,
                     feedback=None,
