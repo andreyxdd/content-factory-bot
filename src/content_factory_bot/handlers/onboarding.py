@@ -392,6 +392,9 @@ async def _return_to_confirm(message: Message, state: FSMContext, lang: str, con
 
 async def _send_prompt(target: Message, state: FSMContext, lang: str, step: str) -> None:
     await state.update_data(current_step=step)
+    if step in {"s2_confirm", "s3_confirm", "s4_confirm", "s6_confirm"}:
+        await _return_to_confirm(target, state, lang, step)
+        return
     if step == "s2_goals":
         selected = set((await state.get_data()).get("goal_selected", []))
         text = (
