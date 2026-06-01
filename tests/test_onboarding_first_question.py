@@ -16,6 +16,7 @@ def test_ready_keyboard_has_continue_cancel_help_only() -> None:
     assert "onb:ready:yes" in mapping
     assert mapping["onb:ready:yes"] == "Continue"
     assert "onb:nav:cancel" in mapping
+    assert mapping["onb:nav:cancel"] == "⏸️ Pause"
     assert "onb:nav:help" in mapping
     assert "onb:nav:back" not in mapping
     assert "onb:ready:no" not in mapping

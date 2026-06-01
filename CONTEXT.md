@@ -26,6 +26,10 @@ _Avoid_: Locale, language_code (API field name)
 The first-run (or re-run) interactive interview: **primary language** first, then personality questions. Persists answers as a **personality profile**.
 _Avoid_: Grill session (process name only), setup, wizard
 
+**Pause onboarding**:
+Non-destructive interruption of an **onboarding session** from in-flow navigation. Resume via `/onboarding` from the latest available checkpoint (prefer latest confirm card; otherwise current question). Destructive reset is only `/cancel`.
+_Avoid_: Quit (ambiguous), cancel onboarding (reserved for `/cancel`)
+
 **Personality profile**:
 The assembled set of **profile answers** from the onboarding grill (occupation, goals, audience, tone, limits, personal angle, etc.). Used as mandatory context for **writing step** and **review step**.
 _Avoid_: Persona, brand kit, style guide (unless we add explicit brand assets later)

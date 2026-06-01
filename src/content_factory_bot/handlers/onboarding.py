@@ -14,6 +14,7 @@ from content_factory_bot.handlers.providers_screen import send_providers_screen
 from content_factory_bot.middleware.locale import UI_LANG_KEY
 from content_factory_bot.services.creators import ensure_creator
 from content_factory_bot.services.onboarding_engine import (
+    S2_KEYS,
     build_s2_summary,
     build_style_card,
     build_system_prompt,
@@ -104,9 +105,22 @@ def _yes_set(lang: str) -> set[str]:
     return {"да", "yes", "y", "ok", "готов", "готова"} if lang == "ru" else {"yes", "y", "ok", "ready"}
 
 
+def _checkpoint_step(fsm: dict) -> str | None:
+    answers = fsm.get("answers", {})
+    if fsm.get("system_prompt_text"):
+        return "s6_confirm"
+    if fsm.get("values_block_text"):
+        return "s4_confirm"
+    if fsm.get("style_card_text"):
+        return "s3_confirm"
+    if all(key in answers for key in S2_KEYS):
+        return "s2_confirm"
+    return None
+
+
 def _nav_row(lang: str, *, include_back: bool = True, include_skip: bool = False) -> list[InlineKeyboardButton]:
     back = "⬅️ Назад" if lang == "ru" else "⬅️ Back"
-    cancel = "🛑 Выйти" if lang == "ru" else "🛑 Quit"
+    cancel = "⏸️ Пауза" if lang == "ru" else "⏸️ Pause"
     help_text = "❓ Помощь" if lang == "ru" else "❓ Help"
     skip_text = "⏭️ Пропустить" if lang == "ru" else "⏭️ Skip"
     row = []
@@ -675,8 +689,17 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
     if parts[1] == "nav":
         action = parts[2]
         if action == "cancel":
-            await state.clear()
-            await callback.message.answer("Онбординг отменен." if lang == "ru" else "Onboarding cancelled.")
+            current_step = fsm.get("current_step")
+            checkpoint = _checkpoint_step(fsm) or current_step or "s1_ready"
+            await state.update_data(current_step=checkpoint)
+            paused_text = (
+                "Онбординг поставлен на паузу. Возобновим с последней контрольной точки через /onboarding. "
+                "Если хочешь удалить прогресс, используй /cancel."
+                if lang == "ru"
+                else "Onboarding paused. Resume from your latest checkpoint with /onboarding. "
+                "If you want to discard progress, use /cancel."
+            )
+            await callback.message.answer(paused_text)
             await callback.answer()
             return
         if action == "help":

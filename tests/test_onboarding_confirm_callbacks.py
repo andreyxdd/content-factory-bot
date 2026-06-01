@@ -96,3 +96,28 @@ async def test_s3_sample_saved_ack_includes_analyze_button() -> None:
     assert args[0] == "Sample saved (1)."
     callbacks = _callback_data_set(kwargs["reply_markup"])
     assert "onb:sample:analyze" in callbacks
+
+
+@pytest.mark.asyncio
+async def test_nav_cancel_pauses_and_moves_to_latest_confirm_checkpoint() -> None:
+    callback = AsyncMock()
+    callback.from_user.id = 31
+    callback.data = "onb:nav:cancel"
+    callback.message = AsyncMock()
+    state = AsyncMock()
+    state.get_data = AsyncMock(
+        return_value={
+            "current_step": "s4_beliefs",
+            "style_card_text": "YOUR STYLE CARD",
+            "answers": {
+                "s2_about": "A",
+                "s2_audience": "B",
+            },
+        }
+    )
+
+    await on_onboarding_callback(callback, state, **{UI_LANG_KEY: "en"})
+
+    state.update_data.assert_awaited_once_with(current_step="s3_confirm")
+    args, _ = callback.message.answer.await_args
+    assert "Onboarding paused" in args[0]
