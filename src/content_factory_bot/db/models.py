@@ -41,6 +41,7 @@ class Creator(Base):
     primary_language: Mapped[str] = mapped_column(String(8), default=PrimaryLanguage.EN)
     review_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     research_default_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    system_prompt_addition: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

@@ -8,8 +8,10 @@ from content_factory_bot.db.session import session_scope
 from content_factory_bot.locale.i18n import t
 from content_factory_bot.middleware.locale import UI_LANG_KEY
 from content_factory_bot.services.onboarding_engine import EDITABLE_FIELDS
+from content_factory_bot.services.creator_prompt_addition import get_system_prompt_addition
 from content_factory_bot.services.profile_artifacts import get_active_artifact_set
 from content_factory_bot.services.profile import format_profile_summary, is_profile_ready
+from content_factory_bot.services.system_prompt import compose_system_prompt
 
 router = Router(name="profile")
 
@@ -42,6 +44,8 @@ async def cmd_export_system_prompt(message: Message, **data) -> None:
         if not prompt_text.strip():
             profile = await session.get(PersonalityProfile, uid)
             prompt_text = (profile.system_prompt_text if profile else "") or ""
+        addition = await get_system_prompt_addition(session, uid)
+        prompt_text = compose_system_prompt(prompt_text, addition)
 
     if not prompt_text.strip():
         await message.answer(

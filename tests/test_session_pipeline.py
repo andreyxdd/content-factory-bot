@@ -14,6 +14,7 @@ from content_factory_bot.services.content_session import save_text_input, start_
 from content_factory_bot.services.draft import DraftOrchestrator, StubChatClient
 from content_factory_bot.services.onboarding_engine import required_answer_keys
 from content_factory_bot.services.profile import mark_profile_ready, save_answer
+from content_factory_bot.services.creator_prompt_addition import set_system_prompt_addition
 from content_factory_bot.services.session_pipeline import process_session_input
 from content_factory_bot.services.session_states import AWAITING_ANGLE_CHOICE
 
@@ -117,3 +118,32 @@ async def test_process_input_prefers_localized_artifact_prompt(db_session: Async
         orchestrator=DraftOrchestrator(client=stub),
     )
     assert "LOCALIZED_SYSTEM_PROMPT" in stub.last_system_message
+
+
+@pytest.mark.asyncio
+async def test_process_input_includes_prompt_addition(db_session: AsyncSession) -> None:
+    uid = 42
+    await set_system_prompt_addition(db_session, uid, "Mention our newsletter.")
+    db_session.add(
+        ProfileArtifactSet(
+            telegram_user_id=uid,
+            locale="en",
+            profile_version=1,
+            status="active",
+            is_active=True,
+            system_prompt_text="LOCALIZED_SYSTEM_PROMPT",
+        )
+    )
+    await db_session.commit()
+    row = await start_session(
+        db_session, uid, web_research=False, cover_generation=False
+    )
+    await save_text_input(db_session, row.id, "Topic")
+    stub = StubChatClient(_ANGLES_JSON)
+    await process_session_input(
+        db_session,
+        row,
+        orchestrator=DraftOrchestrator(client=stub),
+    )
+    assert "LOCALIZED_SYSTEM_PROMPT" in stub.last_system_message
+    assert "Mention our newsletter." in stub.last_system_message
