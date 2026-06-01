@@ -196,11 +196,27 @@ async def list_recent_sessions(
 ) -> list[ContentSession]:
     result = await session.execute(
         select(ContentSession)
-        .where(ContentSession.telegram_user_id == telegram_user_id)
+        .where(
+            ContentSession.telegram_user_id == telegram_user_id,
+            ContentSession.state != "deleted",
+        )
         .order_by(ContentSession.id.desc())
         .limit(limit)
     )
     return list(result.scalars().all())
+
+
+async def delete_session(
+    session: AsyncSession, session_id: int, telegram_user_id: int
+) -> ContentSession | None:
+    row = await get_session_by_id(session, session_id, telegram_user_id)
+    if row is None or row.state == "deleted":
+        return None
+    row.state = "deleted"
+    row.is_active = False
+    await session.commit()
+    await session.refresh(row)
+    return row
 
 
 async def save_for_later(
@@ -229,7 +245,7 @@ async def resume_session(
     session: AsyncSession, session_id: int, telegram_user_id: int
 ) -> ContentSession | None:
     row = await get_session_by_id(session, session_id, telegram_user_id)
-    if row is None or row.state in ("closed", "published"):
+    if row is None or row.state in ("closed", "published", "deleted"):
         return None
     if row.state == "ready_to_publish_later":
         row.is_active = True

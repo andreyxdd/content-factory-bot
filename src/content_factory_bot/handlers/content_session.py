@@ -13,6 +13,8 @@ from content_factory_bot.keyboards.draft import (
     draft_options_keyboard,
     follow_up_keyboard,
     publish_keyboard,
+    session_delete_confirm_keyboard,
+    sessions_list_keyboard,
 )
 from content_factory_bot.keyboards.session_flow import finalize_keyboard, setup_keyboard
 from content_factory_bot.services.session_states import is_legacy_state
@@ -31,9 +33,11 @@ from content_factory_bot.locale.i18n import t
 from content_factory_bot.middleware.locale import UI_LANG_KEY
 from content_factory_bot.services.content_session import (
     aggregate_input_text,
+    delete_session,
     get_active_session,
     get_latest_draft_round,
     get_session_by_id,
+    list_recent_sessions,
     next_round_no,
     parse_options,
     resume_session,
@@ -392,6 +396,23 @@ async def _run_drafts(
     )
 
 
+async def _refresh_sessions_list_message(
+    callback: CallbackQuery, uid: int, lang: str
+) -> None:
+    if not callback.message:
+        return
+    async with session_scope() as session:
+        rows = await list_recent_sessions(session, uid, limit=10)
+    if not rows:
+        await callback.message.edit_text(t("sessions_list_empty_after_delete", lang))
+        return
+    pairs = [(r.id, r.title, r.state) for r in rows]
+    await callback.message.edit_text(
+        t("sessions_list", lang),
+        reply_markup=sessions_list_keyboard(pairs, lang),
+    )
+
+
 @router.callback_query(F.data.startswith("cs:"))
 async def on_session_callback(callback: CallbackQuery, state: FSMContext, **data) -> None:
     if not callback.from_user or not callback.data:
@@ -416,6 +437,36 @@ async def on_session_callback(callback: CallbackQuery, state: FSMContext, **data
                 await callback.message.answer(  # type: ignore[union-attr]
                     t("session_resumed", lang).format(id=row.id, state=row.state)
                 )
+        await callback.answer()
+        return
+
+    if parts[1] == "del" and len(parts) == 3:
+        sid = int(parts[2])
+        async with session_scope() as session:
+            row = await get_session_by_id(session, sid, uid)
+            if row is None:
+                await callback.answer(t("session_not_found", lang), show_alert=True)
+                return
+        if callback.message:
+            await callback.message.edit_reply_markup(
+                reply_markup=session_delete_confirm_keyboard(sid, lang)
+            )
+        await callback.answer()
+        return
+
+    if parts[1] == "delok" and len(parts) == 3:
+        sid = int(parts[2])
+        async with session_scope() as session:
+            row = await delete_session(session, sid, uid)
+            if row is None:
+                await callback.answer(t("session_not_found", lang), show_alert=True)
+                return
+        await _refresh_sessions_list_message(callback, uid, lang)
+        await callback.answer(t("session_deleted", lang))
+        return
+
+    if parts[1] == "dellist":
+        await _refresh_sessions_list_message(callback, uid, lang)
         await callback.answer()
         return
 

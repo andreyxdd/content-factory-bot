@@ -70,14 +70,39 @@ def publish_keyboard(session_id: int, lang: str) -> InlineKeyboardMarkup:
 def sessions_list_keyboard(
     sessions: list[tuple[int, str, str]], lang: str
 ) -> InlineKeyboardMarkup:
+    from content_factory_bot.locale.i18n import t
+
     rows: list[list[InlineKeyboardButton]] = []
+    delete_label = t("session_delete_btn", lang)
     for sid, title, state in sessions:
-        label = f"{title[:40]} ({state})"
+        label = f"{title[:36]} ({state})"
         rows.append(
             [
                 InlineKeyboardButton(
                     text=label, callback_data=f"cs:resume:{sid}"
-                )
+                ),
+                InlineKeyboardButton(
+                    text=delete_label, callback_data=f"cs:del:{sid}"
+                ),
             ]
         )
     return InlineKeyboardMarkup(inline_keyboard=rows or [[]])
+
+
+def session_delete_confirm_keyboard(sid: int, lang: str) -> InlineKeyboardMarkup:
+    from content_factory_bot.locale.i18n import t
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=t("session_delete_yes", lang),
+                    callback_data=f"cs:delok:{sid}",
+                ),
+                InlineKeyboardButton(
+                    text=t("session_delete_no", lang),
+                    callback_data=f"cs:dellist",
+                ),
+            ]
+        ]
+    )
