@@ -28,10 +28,9 @@ async def deliver_angle_round(
         try:
             profile = await format_profile_summary(session, telegram_user_id, lang)
             opts = [f"{a.hook}\n{a.preview}" for a in angles]
-            critique = await ReviewStep().critique(
-                draft_options=opts, profile_summary=profile
+            review_text = await ReviewStep().critique(
+                draft_options=opts, profile_summary=profile, lang=lang
             )
-            review_text = t("session_review", lang).format(text=critique[:3500])
             if message is not None:
                 await message.answer(review_text)
             else:
@@ -65,10 +64,9 @@ async def deliver_draft_round(
     if creator and creator.review_enabled:
         try:
             profile = await format_profile_summary(session, telegram_user_id, lang)
-            critique = await ReviewStep().critique(
-                draft_options=options, profile_summary=profile
+            review_text = await ReviewStep().critique(
+                draft_options=options, profile_summary=profile, lang=lang
             )
-            review_text = t("session_review", lang).format(text=critique[:3500])
             if message is not None:
                 await message.answer(review_text)
             else:
