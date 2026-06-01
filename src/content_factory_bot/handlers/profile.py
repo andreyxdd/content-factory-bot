@@ -16,11 +16,24 @@ router = Router(name="profile")
 async def cmd_profile(message: Message, state: FSMContext, **data) -> None:
     if not message.from_user:
         return
-    lang = data.get(UI_LANG_KEY, "en")
-    uid = message.from_user.id
+    await show_profile(
+        message,
+        state,
+        uid=message.from_user.id,
+        lang=data.get(UI_LANG_KEY, "en"),
+    )
+
+
+async def show_profile(
+    target: Message,
+    state: FSMContext,
+    *,
+    uid: int,
+    lang: str,
+) -> None:
     async with session_scope() as session:
         if not await is_profile_ready(session, uid):
-            await message.answer(t("onboarding_required", lang))
+            await target.answer(t("onboarding_required", lang))
             return
         summary = await format_profile_summary(session, uid, lang)
 
@@ -33,7 +46,7 @@ async def cmd_profile(message: Message, state: FSMContext, **data) -> None:
         ]
         for f in EDITABLE_FIELDS
     ]
-    await message.answer(
+    await target.answer(
         f"<b>{t('profile_title', lang)}</b>\n\n{summary}",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
     )

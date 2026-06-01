@@ -187,15 +187,32 @@ async def on_start_menu(callback: CallbackQuery, state: FSMContext, **data) -> N
     action = callback.data.split(":", 1)[1]
 
     if action == "onboarding":
-        from content_factory_bot.handlers.onboarding import cmd_onboarding
+        from content_factory_bot.handlers.onboarding import start_onboarding
 
-        await cmd_onboarding(callback.message, state, **data)  # type: ignore[arg-type]
+        if not callback.from_user:
+            await callback.answer()
+            return
+        await start_onboarding(
+            callback.message,
+            state,
+            uid=callback.from_user.id,
+            language_code=callback.from_user.language_code,
+            lang=lang,
+        )
         await callback.answer()
         return
     if action == "profile":
-        from content_factory_bot.handlers.profile import cmd_profile
+        from content_factory_bot.handlers.profile import show_profile
 
-        await cmd_profile(callback.message, state, **data)  # type: ignore[arg-type]
+        if not callback.from_user:
+            await callback.answer()
+            return
+        await show_profile(
+            callback.message,
+            state,
+            uid=callback.from_user.id,
+            lang=lang,
+        )
         await callback.answer()
         return
     if action == "settings":

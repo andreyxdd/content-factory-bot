@@ -633,19 +633,34 @@ async def _fetch_link_sample(url: str) -> str | None:
 async def cmd_onboarding(message: Message, state: FSMContext, **data) -> None:
     if not message.from_user:
         return
-    uid = message.from_user.id
-    lang = _lang(data)
+    await start_onboarding(
+        message,
+        state,
+        uid=message.from_user.id,
+        language_code=message.from_user.language_code,
+        lang=_lang(data),
+    )
+
+
+async def start_onboarding(
+    target: Message,
+    state: FSMContext,
+    *,
+    uid: int,
+    language_code: str | None,
+    lang: str,
+) -> None:
     async with session_scope() as session:
         await ensure_creator(
             session,
             telegram_user_id=uid,
-            language_code=message.from_user.language_code,
+            language_code=language_code,
         )
     await state.set_state(OnboardingStates.in_progress)
     fsm = await state.get_data()
     step = fsm.get("current_step")
     if step:
-        await _send_prompt(message, state, lang, step)
+        await _send_prompt(target, state, lang, step)
         return
     async with session_scope() as session:
         answers = await get_profile_answers_map(session, uid)
@@ -660,7 +675,7 @@ async def cmd_onboarding(message: Message, state: FSMContext, **data) -> None:
             pending_edit_key=None,
             pending_edit_confirm_step=None,
         )
-        await _send_prompt(message, state, lang, resume_step)
+        await _send_prompt(target, state, lang, resume_step)
         return
     await state.update_data(
         current_step="s1_ready",
@@ -671,7 +686,7 @@ async def cmd_onboarding(message: Message, state: FSMContext, **data) -> None:
         pending_edit_key=None,
         pending_edit_confirm_step=None,
     )
-    await _send_prompt(message, state, lang, "s1_ready")
+    await _send_prompt(target, state, lang, "s1_ready")
 
 
 @router.callback_query(OnboardingStates.in_progress, F.data.startswith("onb:"))
