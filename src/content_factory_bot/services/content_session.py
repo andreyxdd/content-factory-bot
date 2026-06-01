@@ -55,6 +55,7 @@ async def start_session(
         web_research=web_research,
         cover_generation=cover_generation,
         destinations_json=json.dumps(destinations or []),
+        session_trace_json=None,
     )
     session.add(row)
     await session.commit()
@@ -202,12 +203,39 @@ async def list_recent_sessions(
     return list(result.scalars().all())
 
 
+async def save_for_later(
+    session: AsyncSession,
+    row: ContentSession,
+    *,
+    final_text: str,
+    trace_json: str | None = None,
+) -> None:
+    row.final_draft_text = final_text
+    if trace_json is not None:
+        row.session_trace_json = trace_json
+    row.state = "ready_to_publish_later"
+    row.is_active = False
+    await session.commit()
+
+
+async def set_destinations(
+    session: AsyncSession, row: ContentSession, destinations: list[str]
+) -> None:
+    row.destinations_json = json.dumps(destinations)
+    await session.commit()
+
+
 async def resume_session(
     session: AsyncSession, session_id: int, telegram_user_id: int
 ) -> ContentSession | None:
     row = await get_session_by_id(session, session_id, telegram_user_id)
     if row is None or row.state in ("closed", "published"):
         return None
+    if row.state == "ready_to_publish_later":
+        row.is_active = True
+        await session.commit()
+        await session.refresh(row)
+        return row
     await close_active_sessions(session, telegram_user_id)
     row.is_active = True
     await session.commit()

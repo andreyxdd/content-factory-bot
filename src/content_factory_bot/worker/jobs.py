@@ -6,7 +6,7 @@ from content_factory_bot.db.models import Creator
 from content_factory_bot.db.session import session_scope
 from content_factory_bot.locale.i18n import t
 from content_factory_bot.services.content_session import get_session_by_id, set_session_state
-from content_factory_bot.services.draft_delivery import deliver_draft_round
+from content_factory_bot.services.draft_delivery import deliver_angle_round
 from content_factory_bot.services.session_pipeline import process_session_input
 from content_factory_bot.services.telegram_notify import notify_creator
 
@@ -35,12 +35,15 @@ async def _draft_round(payload: dict) -> None:
             creator = await db.get(Creator, telegram_user_id)
             if creator:
                 lang = creator.primary_language
-            rnd, options = await process_session_input(db, row)
-            await deliver_draft_round(
+            await notify_creator(
+                telegram_user_id, t("session_stage_angles", lang)
+            )
+            rnd, angles = await process_session_input(db, row)
+            await deliver_angle_round(
                 telegram_user_id=telegram_user_id,
                 session_id=session_id,
                 round_no=rnd,
-                options=options,
+                angles=angles,
                 lang=lang,
                 session=db,
                 message=None,

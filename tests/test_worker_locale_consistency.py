@@ -25,9 +25,10 @@ async def test_draft_round_uses_creator_primary_language_for_delivery() -> None:
         ),
         patch(
             "content_factory_bot.worker.jobs.process_session_input",
-            AsyncMock(return_value=(1, ["A", "B", "C"])),
+            AsyncMock(return_value=(1, [])),
         ),
-        patch("content_factory_bot.worker.jobs.deliver_draft_round", AsyncMock()) as deliver,
+        patch("content_factory_bot.worker.jobs.notify_creator", AsyncMock()),
+        patch("content_factory_bot.worker.jobs.deliver_angle_round", AsyncMock()) as deliver,
     ):
         await _draft_round({"session_id": 10, "telegram_user_id": 42})
 

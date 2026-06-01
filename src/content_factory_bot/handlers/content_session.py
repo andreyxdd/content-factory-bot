@@ -4,7 +4,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, Message
 
 from content_factory_bot.config import get_settings
 from content_factory_bot.db.models import Creator
@@ -13,6 +13,19 @@ from content_factory_bot.keyboards.draft import (
     draft_options_keyboard,
     follow_up_keyboard,
     publish_keyboard,
+)
+from content_factory_bot.keyboards.session_flow import finalize_keyboard, setup_keyboard
+from content_factory_bot.services.session_states import is_legacy_state
+from content_factory_bot.services.linear_session_handler import (
+    handle_angle_callback,
+    handle_angle_edit_text,
+    handle_ending_callback,
+    handle_finalize_callback,
+    handle_publish_callback,
+    handle_publish_dest_toggle,
+    handle_publish_retry,
+    handle_tribal_callback,
+    handle_tribal_feedback_text,
 )
 from content_factory_bot.locale.i18n import t
 from content_factory_bot.middleware.locale import UI_LANG_KEY
@@ -37,9 +50,9 @@ from content_factory_bot.services.draft import DraftOrchestrator
 from content_factory_bot.handlers.providers_screen import send_providers_screen
 from content_factory_bot.services.profile import format_profile_summary, is_profile_ready
 from content_factory_bot.services.profile_artifacts import current_prompt_context
-from content_factory_bot.services.providers import is_setup_complete, list_active_providers
+from content_factory_bot.services.providers import is_setup_complete
 from content_factory_bot.services.publish import PublishOrchestrator
-from content_factory_bot.services.draft_delivery import deliver_draft_round
+from content_factory_bot.services.draft_delivery import deliver_angle_round
 from content_factory_bot.services.session_pipeline import process_session_input
 from content_factory_bot.services.telegram_notify import notify_creator
 from content_factory_bot.services.stt import transcribe_audio
@@ -58,58 +71,10 @@ class SessionCustomStates(StatesGroup):
     draft_custom = State()
 
 
-def _dest_label(lang: str, provider: str, selected: bool) -> str:
-    mark = "✅ " if selected else ""
-    return f"{mark}{provider}"
-
-
-def _setup_keyboard(
-    lang: str,
-    *,
-    research: bool,
-    cover: bool,
-    connected: list[str],
-    selected: set[str],
-) -> InlineKeyboardMarkup:
-    r = "✅ " if research else ""
-    c = "✅ " if cover else ""
-    rows: list[list[InlineKeyboardButton]] = []
-    if len(connected) >= 2:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text=t("session_destinations_header", lang),
-                    callback_data="cs:noop",
-                )
-            ]
-        )
-        for prov in connected:
-            rows.append(
-                [
-                    InlineKeyboardButton(
-                        text=_dest_label(lang, prov, prov in selected),
-                        callback_data=f"cs:dest:{prov}",
-                    )
-                ]
-            )
-    rows.extend(
-        [
-            [
-                InlineKeyboardButton(
-                    text=f"{r}{t('session_research', lang)}",
-                    callback_data="cs:toggle:research",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=f"{c}{t('session_cover', lang)}",
-                    callback_data="cs:toggle:cover",
-                )
-            ],
-            [InlineKeyboardButton(text=t("session_start", lang), callback_data="cs:start")],
-        ]
-    )
-    return InlineKeyboardMarkup(inline_keyboard=rows)
+class SessionFlowStates(StatesGroup):
+    angle_edit = State()
+    tribal_feedback = State()
+    ending_regen = State()
 
 
 def _lang(data: dict) -> str:
@@ -137,25 +102,12 @@ async def cmd_new(message: Message, state: FSMContext, **data) -> None:
             return
         creator = await session.get(Creator, uid)
         research = creator.research_default_enabled if creator else True
-        connected = await list_active_providers(session, uid)
 
-    destinations = list(connected)
     await state.set_state(NewSessionStates.setup)
-    await state.update_data(
-        research=research,
-        cover=False,
-        destinations=destinations,
-        connected=connected,
-    )
+    await state.update_data(research=research, cover=False)
     await message.answer(
         t("session_setup_intro", lang),
-        reply_markup=_setup_keyboard(
-            lang,
-            research=research,
-            cover=False,
-            connected=connected,
-            selected=set(destinations),
-        ),
+        reply_markup=setup_keyboard(lang, research=research, cover=False),
     )
 
 
@@ -168,48 +120,12 @@ async def on_session_setup(callback: CallbackQuery, state: FSMContext, **data) -
     fsm = await state.get_data()
     research = bool(fsm.get("research", True))
     cover = bool(fsm.get("cover", False))
-    connected: list[str] = list(fsm.get("connected") or [])
-    destinations: list[str] = list(fsm.get("destinations") or connected)
-    selected = set(destinations)
-
-    if callback.data == "cs:noop":
-        await callback.answer()
-        return
-
-    if callback.data.startswith("cs:dest:"):
-        prov = callback.data.split(":", 2)[2]
-        if prov in selected:
-            selected.discard(prov)
-        else:
-            selected.add(prov)
-        if not selected:
-            await callback.answer(t("session_destinations_required", lang), show_alert=True)
-            return
-        destinations = [p for p in connected if p in selected]
-        await state.update_data(destinations=destinations)
-        await callback.message.edit_reply_markup(  # type: ignore[union-attr]
-            reply_markup=_setup_keyboard(
-                lang,
-                research=research,
-                cover=cover,
-                connected=connected,
-                selected=set(destinations),
-            )
-        )
-        await callback.answer()
-        return
 
     if callback.data == "cs:toggle:research":
         research = not research
         await state.update_data(research=research)
         await callback.message.edit_reply_markup(  # type: ignore[union-attr]
-            reply_markup=_setup_keyboard(
-                lang,
-                research=research,
-                cover=cover,
-                connected=connected,
-                selected=set(destinations),
-            )
+            reply_markup=setup_keyboard(lang, research=research, cover=cover)
         )
         await callback.answer()
         return
@@ -218,28 +134,19 @@ async def on_session_setup(callback: CallbackQuery, state: FSMContext, **data) -
         cover = not cover
         await state.update_data(cover=cover)
         await callback.message.edit_reply_markup(  # type: ignore[union-attr]
-            reply_markup=_setup_keyboard(
-                lang,
-                research=research,
-                cover=cover,
-                connected=connected,
-                selected=set(destinations),
-            )
+            reply_markup=setup_keyboard(lang, research=research, cover=cover)
         )
         await callback.answer()
         return
 
     if callback.data == "cs:start":
-        if not destinations:
-            await callback.answer(t("session_destinations_required", lang), show_alert=True)
-            return
         async with session_scope() as session:
             row = await start_session(
                 session,
                 uid,
                 web_research=research,
                 cover_generation=cover,
-                destinations=destinations,
+                destinations=[],
             )
         await state.clear()
         await callback.message.answer(  # type: ignore[union-attr]
@@ -261,6 +168,53 @@ async def on_text_message(message: Message, state: FSMContext, **data) -> None:
     lang = _lang(data)
     uid = message.from_user.id
     fsm_state = await state.get_state()
+
+    if fsm_state == SessionFlowStates.angle_edit.state:
+        fsm = await state.get_data()
+        sid = int(fsm["session_id"])
+        async with session_scope() as session:
+            row = await get_session_by_id(session, sid, uid)
+            if row is None:
+                await state.clear()
+                await message.answer(t("session_not_found", lang))
+                return
+            await handle_angle_edit_text(
+                message, session, row, uid=uid, lang=lang, instruction=message.text
+            )
+        await state.clear()
+        return
+
+    if fsm_state == SessionFlowStates.tribal_feedback.state:
+        fsm = await state.get_data()
+        sid = int(fsm["session_id"])
+        async with session_scope() as session:
+            row = await get_session_by_id(session, sid, uid)
+            if row is None:
+                await state.clear()
+                return
+            await handle_tribal_feedback_text(
+                message, session, row, uid=uid, lang=lang, feedback=message.text
+            )
+        await state.clear()
+        return
+
+    if fsm_state == SessionFlowStates.ending_regen.state:
+        fsm = await state.get_data()
+        sid = int(fsm["session_id"])
+        async with session_scope() as session:
+            row = await get_session_by_id(session, sid, uid)
+            if row is None:
+                await state.clear()
+                return
+            from content_factory_bot.services.linear_session_handler import (
+                handle_ending_regen_text,
+            )
+
+            await handle_ending_regen_text(
+                message, session, row, uid=uid, lang=lang, instruction=message.text, fsm=fsm
+            )
+        await state.clear()
+        return
 
     if fsm_state == SessionCustomStates.draft_custom.state:
         fsm = await state.get_data()
@@ -426,12 +380,13 @@ async def _run_drafts(
         )
         return
 
-    rnd, options = await process_session_input(session, row)
-    await deliver_draft_round(
+    await message.answer(t("session_stage_angles", lang))
+    rnd, angles = await process_session_input(session, row)
+    await deliver_angle_round(
         telegram_user_id=uid,
         session_id=row.id,
         round_no=rnd,
-        options=options,
+        angles=angles,
         lang=lang,
         session=session,
         message=message,
@@ -453,9 +408,15 @@ async def on_session_callback(callback: CallbackQuery, state: FSMContext, **data
             if row is None:
                 await callback.answer(t("session_not_found", lang), show_alert=True)
                 return
-            await callback.message.answer(  # type: ignore[union-attr]
-                t("session_resumed", lang).format(id=row.id, state=row.state)
-            )
+            if row.state == "ready_to_publish_later":
+                await callback.message.answer(  # type: ignore[union-attr]
+                    t("session_finalize_prompt", lang),
+                    reply_markup=finalize_keyboard(row.id, lang),
+                )
+            else:
+                await callback.message.answer(  # type: ignore[union-attr]
+                    t("session_resumed", lang).format(id=row.id, state=row.state)
+                )
         await callback.answer()
         return
 
@@ -470,6 +431,99 @@ async def on_session_callback(callback: CallbackQuery, state: FSMContext, **data
         if row is None:
             await callback.answer(t("session_not_found", lang), show_alert=True)
             return
+
+        fsm_data = await state.get_data()
+        if not is_legacy_state(row.state):
+            if parts[2] == "angle" and len(parts) == 4:
+                action = parts[3]
+                if action == "edit":
+                    await state.set_state(SessionFlowStates.angle_edit)
+                    await state.update_data(session_id=sid)
+                await handle_angle_callback(
+                    callback, session, row, sid=sid, uid=uid, lang=lang, action=action
+                )
+                return
+            if parts[2] == "ending" and len(parts) == 4:
+                if parts[3] == "regen":
+                    await state.set_state(SessionFlowStates.ending_regen)
+                    await state.update_data(session_id=sid, **fsm_data)
+                await handle_ending_callback(
+                    callback,
+                    session,
+                    row,
+                    sid=sid,
+                    uid=uid,
+                    lang=lang,
+                    action=parts[3],
+                    fsm_data=fsm_data,
+                )
+                await state.update_data(session_id=sid, **fsm_data)
+                return
+            if parts[2] == "tribal" and len(parts) == 4:
+                needs_feedback = await handle_tribal_callback(
+                    callback,
+                    session,
+                    row,
+                    sid=sid,
+                    uid=uid,
+                    lang=lang,
+                    yes=parts[3] == "yes",
+                )
+                if needs_feedback:
+                    await state.set_state(SessionFlowStates.tribal_feedback)
+                    await state.update_data(session_id=sid)
+                return
+            if parts[2] == "fin" and len(parts) == 4:
+                await handle_finalize_callback(
+                    callback,
+                    session,
+                    row,
+                    sid=sid,
+                    uid=uid,
+                    lang=lang,
+                    action=parts[3],
+                    fsm_data=fsm_data,
+                )
+                return
+            if parts[2] == "pub" and len(parts) == 4:
+                await handle_publish_callback(
+                    callback,
+                    session,
+                    row,
+                    sid=sid,
+                    uid=uid,
+                    lang=lang,
+                    action=parts[3],
+                    fsm_data=fsm_data,
+                    bot=callback.bot,
+                )
+                await state.update_data(**fsm_data)
+                return
+            if parts[2] == "pubdest" and len(parts) == 4:
+                await handle_publish_dest_toggle(
+                    callback,
+                    session,
+                    row,
+                    sid=sid,
+                    uid=uid,
+                    lang=lang,
+                    provider=parts[3],
+                    fsm_data=fsm_data,
+                )
+                await state.update_data(**fsm_data)
+                return
+            if parts[2] == "pubretry" and len(parts) == 4:
+                await handle_publish_retry(
+                    callback,
+                    session,
+                    row,
+                    sid=sid,
+                    uid=uid,
+                    lang=lang,
+                    provider=parts[3],
+                    bot=callback.bot,
+                )
+                return
 
         if parts[2] == "pick" and len(parts) == 5:
             round_no = int(parts[3])

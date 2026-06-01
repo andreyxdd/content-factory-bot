@@ -101,7 +101,7 @@ Short structured summary of trends/sources for the session topic, consumed by th
 _Avoid_: Research report, digest
 
 **Cover generation** (session flag):
-Chosen during `/new` **setup** (with destinations and web research), before session input. When on, bot runs a **cover step** after draft text is confirmed and before publish. Off by default.
+Chosen during `/new` **setup** (with web research toggle), before session input. When on, bot runs a **cover step** after draft text is confirmed and before publish. Off by default.
 _Avoid_: Thumbnail, image gen
 
 **Session title**:
@@ -237,7 +237,7 @@ Viewing status, connecting, reconnecting, or disconnecting **provider connection
 _Avoid_: Change profile (use reconnect/disconnect)
 
 **Session destinations**:
-The subset of **provider connections** (status `active`) the Creator selects during `/new` **setup** for that **content session**. If exactly one is connected, that provider is implicit (no destination toggles). If two or more: default **all connected** ON; Creator toggles off for this session. Publish uses only this subset.
+The subset of **provider connections** (status `active`) the Creator selects at **publish time** for that **content session** (after final post is approved). Offered only when choosing **Post now**: **all connected** or **choose specific**. Resolved from active connections at publish time, not at session start.
 _Avoid_: Publish intent (broader term), platforms
 
 ### Flagged ambiguities

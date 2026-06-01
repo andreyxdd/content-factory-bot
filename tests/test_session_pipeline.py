@@ -15,6 +15,32 @@ from content_factory_bot.services.draft import DraftOrchestrator, StubChatClient
 from content_factory_bot.services.onboarding_engine import required_answer_keys
 from content_factory_bot.services.profile import mark_profile_ready, save_answer
 from content_factory_bot.services.session_pipeline import process_session_input
+from content_factory_bot.services.session_states import AWAITING_ANGLE_CHOICE
+
+_ANGLES_JSON = json.dumps(
+    {
+        "angles": [
+            {
+                "id": "A",
+                "format": "story",
+                "hook": "H1",
+                "preview": "P1",
+            },
+            {
+                "id": "B",
+                "format": "conflict",
+                "hook": "H2",
+                "preview": "P2",
+            },
+            {
+                "id": "C",
+                "format": "practice",
+                "hook": "H3",
+                "preview": "P3",
+            },
+        ]
+    }
+)
 
 
 @pytest.fixture
@@ -51,14 +77,15 @@ async def test_process_input_creates_draft_round(db_session: AsyncSession) -> No
         db_session, uid, web_research=False, cover_generation=False
     )
     await save_text_input(db_session, row.id, "Redis queues for Telegram bots")
-    stub = StubChatClient(json.dumps({"options": ["A", "B", "C"]}))
-    rnd, options = await process_session_input(
+    stub = StubChatClient(_ANGLES_JSON)
+    rnd, angles = await process_session_input(
         db_session, row, orchestrator=DraftOrchestrator(client=stub)
     )
     assert rnd == 1
-    assert options == ["A", "B", "C"]
+    assert len(angles) == 3
+    assert angles[0].id == "A"
     await db_session.refresh(row)
-    assert row.state == "awaiting_draft_choice"
+    assert row.state == AWAITING_ANGLE_CHOICE
     assert row.title.startswith("Redis")
 
 
@@ -83,10 +110,10 @@ async def test_process_input_prefers_localized_artifact_prompt(db_session: Async
         db_session, uid, web_research=False, cover_generation=False
     )
     await save_text_input(db_session, row.id, "Edge compute founders")
-    stub = StubChatClient(json.dumps({"options": ["A", "B", "C"]}))
+    stub = StubChatClient(_ANGLES_JSON)
     await process_session_input(
         db_session,
         row,
         orchestrator=DraftOrchestrator(client=stub),
     )
-    assert "LOCALIZED_SYSTEM_PROMPT" in stub.last_user_message
+    assert "LOCALIZED_SYSTEM_PROMPT" in stub.last_system_message
