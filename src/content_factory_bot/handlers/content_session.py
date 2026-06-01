@@ -18,6 +18,10 @@ from content_factory_bot.keyboards.draft import (
 )
 from content_factory_bot.keyboards.session_flow import finalize_keyboard, setup_keyboard
 from content_factory_bot.services.session_states import is_legacy_state
+from content_factory_bot.services.system_prompt import (
+    MAX_SYSTEM_PROMPT_ADDITION_LEN,
+    validate_system_prompt_addition,
+)
 from content_factory_bot.services.linear_session_handler import (
     handle_angle_callback,
     handle_angle_edit_text,
@@ -70,6 +74,37 @@ router = Router(name="content_session")
 
 class NewSessionStates(StatesGroup):
     setup = State()
+    instructions = State()
+
+
+def _setup_fsm_flags(fsm: dict) -> tuple[bool, bool, bool]:
+    research = bool(fsm.get("research", True))
+    cover = bool(fsm.get("cover", False))
+    has_instructions = bool((fsm.get("session_prompt_addition") or "").strip())
+    return research, cover, has_instructions
+
+
+async def _reply_session_setup(
+    target: Message,
+    state: FSMContext,
+    *,
+    lang: str,
+    edit: bool = False,
+) -> None:
+    fsm = await state.get_data()
+    research, cover, has_instructions = _setup_fsm_flags(fsm)
+    text = t("session_setup_intro", lang)
+    addition = (fsm.get("session_prompt_addition") or "").strip()
+    if addition:
+        preview = addition[:120] + ("…" if len(addition) > 120 else "")
+        text += "\n\n" + t("session_instructions_current", lang).format(preview=preview)
+    kb = setup_keyboard(
+        lang, research=research, cover=cover, has_instructions=has_instructions
+    )
+    if edit and hasattr(target, "edit_text"):
+        await target.edit_text(text, reply_markup=kb)  # type: ignore[union-attr]
+    else:
+        await target.answer(text, reply_markup=kb)
 
 
 class SessionCustomStates(StatesGroup):
@@ -109,11 +144,8 @@ async def cmd_new(message: Message, state: FSMContext, **data) -> None:
         research = creator.research_default_enabled if creator else True
 
     await state.set_state(NewSessionStates.setup)
-    await state.update_data(research=research, cover=False)
-    await message.answer(
-        t("session_setup_intro", lang),
-        reply_markup=setup_keyboard(lang, research=research, cover=False),
-    )
+    await state.update_data(research=research, cover=False, session_prompt_addition="")
+    await _reply_session_setup(message, state, lang=lang)
 
 
 @router.callback_query(NewSessionStates.setup, F.data.startswith("cs:"))
@@ -123,25 +155,45 @@ async def on_session_setup(callback: CallbackQuery, state: FSMContext, **data) -
     lang = _lang(data)
     uid = callback.from_user.id
     fsm = await state.get_data()
-    research = bool(fsm.get("research", True))
-    cover = bool(fsm.get("cover", False))
+    research, cover, has_instructions = _setup_fsm_flags(fsm)
+    addition = (fsm.get("session_prompt_addition") or "").strip() or None
 
     if callback.data == "cs:toggle:research":
-        research = not research
-        await state.update_data(research=research)
-        await callback.message.edit_reply_markup(  # type: ignore[union-attr]
-            reply_markup=setup_keyboard(lang, research=research, cover=cover)
+        await state.update_data(research=not research)
+        await _reply_session_setup(
+            callback.message, state, lang=lang, edit=True  # type: ignore[arg-type]
         )
         await callback.answer()
         return
 
     if callback.data == "cs:toggle:cover":
-        cover = not cover
-        await state.update_data(cover=cover)
-        await callback.message.edit_reply_markup(  # type: ignore[union-attr]
-            reply_markup=setup_keyboard(lang, research=research, cover=cover)
+        await state.update_data(cover=not cover)
+        await _reply_session_setup(
+            callback.message, state, lang=lang, edit=True  # type: ignore[arg-type]
         )
         await callback.answer()
+        return
+
+    if callback.data == "cs:setup:instructions":
+        await state.set_state(NewSessionStates.instructions)
+        prompt = t("session_instructions_prompt", lang).format(
+            max_len=MAX_SYSTEM_PROMPT_ADDITION_LEN
+        )
+        if addition:
+            preview = addition[:200] + ("…" if len(addition) > 200 else "")
+            prompt += "\n\n" + t("session_instructions_current", lang).format(
+                preview=preview
+            )
+        await callback.message.answer(prompt)  # type: ignore[union-attr]
+        await callback.answer()
+        return
+
+    if callback.data == "cs:setup:clear_instructions":
+        await state.update_data(session_prompt_addition="")
+        await _reply_session_setup(
+            callback.message, state, lang=lang, edit=True  # type: ignore[arg-type]
+        )
+        await callback.answer(t("session_instructions_cleared", lang))
         return
 
     if callback.data == "cs:start":
@@ -152,6 +204,7 @@ async def on_session_setup(callback: CallbackQuery, state: FSMContext, **data) -
                 web_research=research,
                 cover_generation=cover,
                 destinations=[],
+                session_prompt_addition=addition,
             )
         await state.clear()
         await callback.message.answer(  # type: ignore[union-attr]
@@ -161,6 +214,30 @@ async def on_session_setup(callback: CallbackQuery, state: FSMContext, **data) -
         return
 
     await callback.answer()
+
+
+@router.message(NewSessionStates.instructions, F.text)
+async def on_session_instructions_text(
+    message: Message, state: FSMContext, **data
+) -> None:
+    if not message.from_user or not message.text:
+        return
+    lang = _lang(data)
+    text = message.text.strip()
+    if text.startswith("/"):
+        return
+    err = validate_system_prompt_addition(text)
+    if err == "too_long":
+        await message.answer(
+            t("session_instructions_too_long", lang).format(
+                max_len=MAX_SYSTEM_PROMPT_ADDITION_LEN
+            )
+        )
+        return
+    await state.update_data(session_prompt_addition=text)
+    await state.set_state(NewSessionStates.setup)
+    await message.answer(t("session_instructions_saved", lang))
+    await _reply_session_setup(message, state, lang=lang)
 
 
 @router.message(F.text)

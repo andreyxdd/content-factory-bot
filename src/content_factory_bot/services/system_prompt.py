@@ -4,15 +4,25 @@ from __future__ import annotations
 
 MAX_SYSTEM_PROMPT_ADDITION_LEN = 2000
 
-_ADDITION_HEADER = "# CREATOR ADDITIONS\n"
+_CREATOR_HEADER = "# CREATOR ADDITIONS\n"
+_SESSION_HEADER = "# SESSION ADDITIONS\n"
 
 
-def compose_system_prompt(base: str, addition: str | None) -> str:
-    """Append user-defined instructions after the onboarding system prompt."""
-    extra = (addition or "").strip()
-    if not extra:
-        return base
-    return f"{base.rstrip()}\n\n{_ADDITION_HEADER}{extra}"
+def compose_system_prompt(
+    base: str,
+    *,
+    creator_addition: str | None = None,
+    session_addition: str | None = None,
+) -> str:
+    """Append creator- and session-scoped instructions after the base system prompt."""
+    out = base.rstrip()
+    creator = (creator_addition or "").strip()
+    session = (session_addition or "").strip()
+    if creator:
+        out = f"{out}\n\n{_CREATOR_HEADER}{creator}"
+    if session:
+        out = f"{out}\n\n{_SESSION_HEADER}{session}"
+    return out
 
 
 def validate_system_prompt_addition(text: str) -> str | None:

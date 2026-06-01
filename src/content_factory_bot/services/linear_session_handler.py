@@ -190,7 +190,9 @@ async def handle_angle_edit_text(
     angle = _find_angle(angles, trace.selected_angle_id or "")
     if angle is None:
         return
-    ctx = await resolve_writing_context(session, telegram_user_id=uid, locale=lang)
+    ctx = await resolve_writing_context(
+        session, telegram_user_id=uid, locale=lang, content_session=row
+    )
     input_text = await aggregate_input_text(session, row.id)
     orch = DraftOrchestrator()
     updated = await orch.edit_selected_angle(
@@ -236,7 +238,9 @@ async def handle_ending_callback(
     fsm_data: dict,
 ) -> None:
     text = row.final_draft_text or ""
-    ctx = await resolve_writing_context(session, telegram_user_id=uid, locale=lang)
+    ctx = await resolve_writing_context(
+        session, telegram_user_id=uid, locale=lang, content_session=row
+    )
     orch = DraftOrchestrator()
     trace = load_trace(row)
 
@@ -315,7 +319,9 @@ async def handle_ending_regen_text(
     instruction: str,
     fsm: dict,
 ) -> None:
-    ctx = await resolve_writing_context(session, telegram_user_id=uid, locale=lang)
+    ctx = await resolve_writing_context(
+        session, telegram_user_id=uid, locale=lang, content_session=row
+    )
     orch = DraftOrchestrator()
     q, p = await orch.generate_two_endings(
         system_prompt=ctx.system_prompt,
@@ -363,7 +369,9 @@ async def handle_tribal_feedback_text(
     message: Message, session, row, *, uid: int, lang: str, feedback: str
 ) -> None:
     trace = load_trace(row)
-    ctx = await resolve_writing_context(session, telegram_user_id=uid, locale=lang)
+    ctx = await resolve_writing_context(
+        session, telegram_user_id=uid, locale=lang, content_session=row
+    )
     orch = DraftOrchestrator()
     post = await orch.rewrite_post_with_feedback(
         system_prompt=ctx.system_prompt,

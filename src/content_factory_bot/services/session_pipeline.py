@@ -68,7 +68,9 @@ async def process_session_input(
     if row.title == "Untitled" and input_text:
         await set_session_title(db, row, await title_from_input(input_text))
 
-    ctx = await resolve_writing_context(db, telegram_user_id=uid, locale=lang)
+    ctx = await resolve_writing_context(
+        db, telegram_user_id=uid, locale=lang, content_session=row
+    )
 
     brief = None
     if row.web_research:
@@ -111,7 +113,9 @@ async def expand_angle_to_post(
     creator = await db.get(Creator, uid)
     if creator:
         lang = creator.primary_language
-    ctx = await resolve_writing_context(db, telegram_user_id=uid, locale=lang)
+    ctx = await resolve_writing_context(
+        db, telegram_user_id=uid, locale=lang, content_session=row
+    )
     input_text = await aggregate_input_text(db, row.id)
     await set_session_state(db, row, EXPANDING_POST)
     orch = orchestrator or DraftOrchestrator()

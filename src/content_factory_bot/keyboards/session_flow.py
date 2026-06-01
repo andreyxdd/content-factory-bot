@@ -1,31 +1,50 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from content_factory_bot.locale.i18n import t
-def setup_keyboard(lang: str, *, research: bool, cover: bool) -> InlineKeyboardMarkup:
+def setup_keyboard(
+    lang: str, *, research: bool, cover: bool, has_instructions: bool = False
+) -> InlineKeyboardMarkup:
     r = "✅ " if research else ""
     c = "✅ " if cover else ""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+    i = "✅ " if has_instructions else ""
+    rows: list[list[InlineKeyboardButton]] = [
+        [
+            InlineKeyboardButton(
+                text=f"{r}{t('session_research', lang)}",
+                callback_data="cs:toggle:research",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=f"{c}{t('session_cover', lang)}",
+                callback_data="cs:toggle:cover",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text=f"{i}{t('session_instructions', lang)}",
+                callback_data="cs:setup:instructions",
+            )
+        ],
+    ]
+    if has_instructions:
+        rows.append(
             [
                 InlineKeyboardButton(
-                    text=f"{r}{t('session_research', lang)}",
-                    callback_data="cs:toggle:research",
+                    text=t("session_instructions_clear", lang),
+                    callback_data="cs:setup:clear_instructions",
                 )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=f"{c}{t('session_cover', lang)}",
-                    callback_data="cs:toggle:cover",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=t("session_start", lang),
-                    callback_data="cs:start",
-                )
-            ],
+            ]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text=t("session_start", lang),
+                callback_data="cs:start",
+            )
         ]
     )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def angle_post_pick_keyboard(session_id: int, lang: str) -> InlineKeyboardMarkup:

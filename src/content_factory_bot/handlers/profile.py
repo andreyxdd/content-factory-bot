@@ -45,7 +45,7 @@ async def cmd_export_system_prompt(message: Message, **data) -> None:
             profile = await session.get(PersonalityProfile, uid)
             prompt_text = (profile.system_prompt_text if profile else "") or ""
         addition = await get_system_prompt_addition(session, uid)
-        prompt_text = compose_system_prompt(prompt_text, addition)
+        prompt_text = compose_system_prompt(prompt_text, creator_addition=addition)
 
     if not prompt_text.strip():
         await message.answer(

@@ -13,9 +13,22 @@ async def test_cmd_settings_shows_language_buttons() -> None:
     message = AsyncMock()
     message.from_user.id = 77
 
-    with patch(
-        "content_factory_bot.handlers.settings._supported_locale_codes",
-        AsyncMock(return_value=["en", "ru"]),
+    session = MagicMock()
+
+    @asynccontextmanager
+    async def _session_scope():
+        yield session
+
+    with (
+        patch(
+            "content_factory_bot.handlers.settings._supported_locale_codes",
+            AsyncMock(return_value=["en", "ru"]),
+        ),
+        patch("content_factory_bot.handlers.settings.session_scope", _session_scope),
+        patch(
+            "content_factory_bot.handlers.settings.get_system_prompt_addition",
+            AsyncMock(return_value=None),
+        ),
     ):
         await cmd_settings(message, **{UI_LANG_KEY: "en"})
 

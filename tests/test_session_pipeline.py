@@ -147,3 +147,27 @@ async def test_process_input_includes_prompt_addition(db_session: AsyncSession) 
     )
     assert "LOCALIZED_SYSTEM_PROMPT" in stub.last_system_message
     assert "Mention our newsletter." in stub.last_system_message
+    assert "# CREATOR ADDITIONS" in stub.last_system_message
+
+
+@pytest.mark.asyncio
+async def test_process_input_includes_session_prompt_addition(
+    db_session: AsyncSession,
+) -> None:
+    uid = 42
+    row = await start_session(
+        db_session,
+        uid,
+        web_research=False,
+        cover_generation=False,
+        session_prompt_addition="Angle for LinkedIn only.",
+    )
+    await save_text_input(db_session, row.id, "Topic")
+    stub = StubChatClient(_ANGLES_JSON)
+    await process_session_input(
+        db_session,
+        row,
+        orchestrator=DraftOrchestrator(client=stub),
+    )
+    assert "# SESSION ADDITIONS" in stub.last_system_message
+    assert "Angle for LinkedIn only." in stub.last_system_message

@@ -46,8 +46,10 @@ async def start_session(
     web_research: bool,
     cover_generation: bool,
     destinations: list[str] | None = None,
+    session_prompt_addition: str | None = None,
 ) -> ContentSession:
     await close_active_sessions(session, telegram_user_id)
+    addition = (session_prompt_addition or "").strip() or None
     row = ContentSession(
         telegram_user_id=telegram_user_id,
         state="awaiting_input",
@@ -56,6 +58,7 @@ async def start_session(
         cover_generation=cover_generation,
         destinations_json=json.dumps(destinations or []),
         session_trace_json=None,
+        session_prompt_addition=addition,
     )
     session.add(row)
     await session.commit()

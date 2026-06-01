@@ -114,6 +114,7 @@ class ContentSession(Base):
     research_brief: Mapped[str | None] = mapped_column(Text, nullable=True)
     final_draft_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     session_trace_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    session_prompt_addition: Mapped[str | None] = mapped_column(Text, nullable=True)
     cover_storage_ref: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

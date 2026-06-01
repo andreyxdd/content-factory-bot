@@ -300,6 +300,16 @@ async def cmd_cancel(message: Message, state: FSMContext, **data) -> None:
         return
     lang = _lang(message, data)
     uid = message.from_user.id
+    from content_factory_bot.handlers.content_session import (
+        NewSessionStates,
+        _reply_session_setup,
+    )
+
+    current = await state.get_state()
+    if current == NewSessionStates.instructions.state:
+        await state.set_state(NewSessionStates.setup)
+        await _reply_session_setup(message, state, lang=lang)
+        return
     had_fsm = await state.get_state() is not None
     await state.clear()
     async with session_scope() as session:

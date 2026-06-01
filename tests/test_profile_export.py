@@ -28,7 +28,13 @@ async def test_export_system_prompt_sends_markdown_from_active_artifact(
     async def _session_scope():
         yield session
 
-    with patch("content_factory_bot.handlers.profile.session_scope", _session_scope):
+    with (
+        patch("content_factory_bot.handlers.profile.session_scope", _session_scope),
+        patch(
+            "content_factory_bot.handlers.profile.get_system_prompt_addition",
+            AsyncMock(return_value=None),
+        ),
+    ):
         await cmd_export_system_prompt(message, **{UI_LANG_KEY: "en"})
 
     message.answer_document.assert_awaited_once()
@@ -58,7 +64,13 @@ async def test_export_system_prompt_uses_profile_fallback(
     async def _session_scope():
         yield session
 
-    with patch("content_factory_bot.handlers.profile.session_scope", _session_scope):
+    with (
+        patch("content_factory_bot.handlers.profile.session_scope", _session_scope),
+        patch(
+            "content_factory_bot.handlers.profile.get_system_prompt_addition",
+            AsyncMock(return_value=None),
+        ),
+    ):
         await cmd_export_system_prompt(message, **{UI_LANG_KEY: "en"})
 
     message.answer_document.assert_awaited_once()
@@ -84,7 +96,13 @@ async def test_export_system_prompt_not_ready_when_missing(
     async def _session_scope():
         yield session
 
-    with patch("content_factory_bot.handlers.profile.session_scope", _session_scope):
+    with (
+        patch("content_factory_bot.handlers.profile.session_scope", _session_scope),
+        patch(
+            "content_factory_bot.handlers.profile.get_system_prompt_addition",
+            AsyncMock(return_value=None),
+        ),
+    ):
         await cmd_export_system_prompt(message, **{UI_LANG_KEY: "en"})
 
     message.answer_document.assert_not_called()

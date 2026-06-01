@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from content_factory_bot.db.models import ContentSession
 from content_factory_bot.services.creator_prompt_addition import get_system_prompt_addition
 from content_factory_bot.services.profile import format_profile_summary
 from content_factory_bot.services.profile_artifacts import (
@@ -27,6 +28,7 @@ async def resolve_writing_context(
     *,
     telegram_user_id: int,
     locale: str,
+    content_session: ContentSession | None = None,
 ) -> WritingContext:
     fallback = await format_profile_summary(session, telegram_user_id, locale)
     system_prompt, status = await current_prompt_context(
@@ -39,9 +41,16 @@ async def resolve_writing_context(
     style_card = ""
     if artifact and artifact.style_card_text:
         style_card = artifact.style_card_text
-    addition = await get_system_prompt_addition(session, telegram_user_id)
+    creator_addition = await get_system_prompt_addition(session, telegram_user_id)
+    session_addition: str | None = None
+    if content_session and content_session.session_prompt_addition:
+        session_addition = content_session.session_prompt_addition.strip() or None
     return WritingContext(
-        system_prompt=compose_system_prompt(system_prompt, addition),
+        system_prompt=compose_system_prompt(
+            system_prompt,
+            creator_addition=creator_addition,
+            session_addition=session_addition,
+        ),
         style_card=style_card,
         status=status,
     )
