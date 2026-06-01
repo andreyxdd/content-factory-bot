@@ -242,19 +242,19 @@ def _help_row(lang: str) -> list[InlineKeyboardButton]:
 
 
 def _sample_actions_kb(lang: str, *, include_skip: bool) -> InlineKeyboardMarkup:
-    analyze = "Анализировать образцы" if lang == "ru" else "Analyze samples"
+    analyze = "🧠 Анализировать образцы" if lang == "ru" else "🧠 Analyze samples"
     rows: list[list[InlineKeyboardButton]] = [
         [InlineKeyboardButton(text=analyze, callback_data="onb:sample:analyze")]
     ]
     if include_skip:
-        skip = "Пропустить пока" if lang == "ru" else "Skip for now"
+        skip = "⏭️ Пропустить пока" if lang == "ru" else "⏭️ Skip for now"
         rows.append([InlineKeyboardButton(text=skip, callback_data="onb:sample:skip")])
     return _kb(rows, lang)
 
 
 def _s7_handoff_kb(lang: str) -> InlineKeyboardMarkup:
-    start = "Перейти к /new" if lang == "ru" else "Go to /new"
-    skip = "Пропустить тест" if lang == "ru" else "Skip test"
+    start = "🚀 Перейти к /new" if lang == "ru" else "🚀 Go to /new"
+    skip = "⏭️ Пропустить тест" if lang == "ru" else "⏭️ Skip test"
     return _kb(
         [
             [InlineKeyboardButton(text=start, callback_data="onb:s7:new")],
@@ -477,14 +477,14 @@ def _goal_kb(lang: str, selected: set[str]) -> InlineKeyboardMarkup:
     for key, label in labels:
         mark = "✅ " if key in selected else ""
         rows.append([InlineKeyboardButton(text=f"{mark}{key}) {label}", callback_data=f"onb:goal:{key}")])
-    done_text = "Готово" if lang == "ru" else "Done"
+    done_text = "✅ Готово" if lang == "ru" else "✅ Done"
     rows.append([InlineKeyboardButton(text=done_text, callback_data="onb:goal:done")])
     return _kb(rows, lang)
 
 
 def _binary_kb(prefix: str, lang: str, *, include_back: bool = True) -> InlineKeyboardMarkup:
-    yes = "Да" if lang == "ru" else "Yes"
-    no = "Нет" if lang == "ru" else "No"
+    yes = "✅ Да" if lang == "ru" else "✅ Yes"
+    no = "❌ Нет" if lang == "ru" else "❌ No"
     return _kb(
         [
             [InlineKeyboardButton(text=yes, callback_data=f"{prefix}:yes")],
@@ -503,7 +503,7 @@ def _optional_text_kb(step: str, lang: str) -> InlineKeyboardMarkup:
 
 
 def _ready_kb(lang: str) -> InlineKeyboardMarkup:
-    continue_label = "Продолжить" if lang == "ru" else "Continue"
+    continue_label = "✅ Продолжить" if lang == "ru" else "✅ Continue"
     return _kb(
         [[InlineKeyboardButton(text=continue_label, callback_data="onb:ready:yes")]],
         lang,
@@ -513,9 +513,9 @@ def _ready_kb(lang: str) -> InlineKeyboardMarkup:
 
 def _confirm_kb(kind: str, lang: str) -> InlineKeyboardMarkup:
     if lang == "ru":
-        ok, edit = "Похоже", "Редактировать поле"
+        ok, edit = "✅ Похоже", "✏️ Редактировать поля"
     else:
-        ok, edit = "Continue", "Edit field"
+        ok, edit = "✅ Continue", "✏️ Edit fields"
     return _kb(
         [
             [InlineKeyboardButton(text=ok, callback_data=f"onb:{kind}:ok")],
@@ -527,11 +527,11 @@ def _confirm_kb(kind: str, lang: str) -> InlineKeyboardMarkup:
 
 def _confirm_edit_fork_kb(kind: str, lang: str) -> InlineKeyboardMarkup:
     if lang == "ru":
-        edit_label = "Редактировать отвеченные поля"
-        continue_label = "Продолжить с оставшимися вопросами"
+        edit_label = "✏️ Редактировать отвеченные поля"
+        continue_label = "➡️ Продолжить с оставшимися вопросами"
     else:
-        edit_label = "Edit answered fields"
-        continue_label = "Continue with additional questions"
+        edit_label = "✏️ Edit answered fields"
+        continue_label = "➡️ Continue with additional questions"
     return _kb(
         [
             [InlineKeyboardButton(text=edit_label, callback_data=f"onb:{kind}:edit_fields")],
