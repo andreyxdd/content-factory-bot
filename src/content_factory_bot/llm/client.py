@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from content_factory_bot.config import get_settings
+from content_factory_bot.llm.parse import message_content_from_response
 
 
 class LLMClient:
@@ -73,4 +74,4 @@ class LLMClient:
             )
             r.raise_for_status()
             data = r.json()
-        return data["choices"][0]["message"]["content"]
+        return message_content_from_response(data)

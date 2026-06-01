@@ -361,7 +361,6 @@ async def _run_drafts(
     lang: str,
     uid: int,
 ) -> None:
-    await message.answer(t("session_drafting", lang))
     settings = get_settings()
     if settings.use_worker:
         await set_session_state(session, row, "drafting")

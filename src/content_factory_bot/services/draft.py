@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from content_factory_bot.llm.client import LLMClient
+from content_factory_bot.llm.parse import loads_json_object
 from content_factory_bot.services.prompt_guard import wrap_user_content
 from content_factory_bot.services.style_length import char_range_for_band, length_band_from_style_card
 
@@ -70,11 +71,11 @@ ANGLES_RESPONSE_FORMAT: dict[str, Any] = {
     "type": "json_schema",
     "json_schema": {
         "name": "angle_round",
-        "strict": True,
-        "schema": {
-            "type": "object",
-            "properties": {
-                "angles": {
+            "strict": False,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "angles": {
                     "type": "array",
                     "items": {
                         "type": "object",
@@ -141,7 +142,7 @@ class AngleOption:
 
 
 def _parse_angles(raw: str) -> list[AngleOption]:
-    data = json.loads(raw)
+    data = loads_json_object(raw)
     angles = data.get("angles")
     if not isinstance(angles, list) or len(angles) != 3:
         raise ValueError(f"Expected 3 angles, got: {angles!r}")
@@ -159,7 +160,7 @@ def _parse_angles(raw: str) -> list[AngleOption]:
 
 
 def _parse_options(raw: str) -> list[str]:
-    data = json.loads(raw)
+    data = loads_json_object(raw)
     options = data.get("options")
     if not isinstance(options, list) or len(options) != 3:
         raise ValueError(f"Expected 3 options, got: {options!r}")
@@ -313,11 +314,27 @@ class DraftOrchestrator:
         if research_brief:
             parts.append(f"<research>\n{research_brief}\n</research>")
         user = "\n\n".join(parts) + "\n\n" + task
-        raw = await self._client_or_default().chat(
-            self._messages(system_prompt=system_prompt, user_content=user),
-            response_format=ANGLES_RESPONSE_FORMAT,
-        )
-        return _parse_angles(raw)
+        client = self._client_or_default()
+        try:
+            raw = await client.chat(
+                self._messages(system_prompt=system_prompt, user_content=user),
+                response_format=ANGLES_RESPONSE_FORMAT,
+            )
+            return _parse_angles(raw)
+        except (json.JSONDecodeError, ValueError) as exc:
+            logger.warning("generate_three_angles strict parse failed: %s", exc)
+            loose_user = (
+                user
+                + "\n\nReturn ONLY a JSON object: "
+                '{"angles":[{"id":"A","format":"story","hook":"...","preview":"..."},'
+                '{"id":"B","format":"conflict","hook":"...","preview":"..."},'
+                '{"id":"C","format":"practice","hook":"...","preview":"..."}]}'
+            )
+            raw = await client.chat(
+                self._messages(system_prompt=system_prompt, user_content=loose_user),
+                response_format={"type": "json_object"},
+            )
+            return _parse_angles(raw)
 
     async def edit_selected_angle(
         self,
@@ -395,7 +412,7 @@ class DraftOrchestrator:
             self._messages(system_prompt=system_prompt, user_content=user),
             response_format=ENDINGS_RESPONSE_FORMAT,
         )
-        data = json.loads(raw)
+        data = loads_json_object(raw)
         return str(data["question_ending"]), str(data["punch_ending"])
 
     async def rewrite_post_with_feedback(
