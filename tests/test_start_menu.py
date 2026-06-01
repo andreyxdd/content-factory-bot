@@ -69,7 +69,10 @@ async def test_start_returning_shows_profile_and_other_buttons() -> None:
     _, kwargs = message.answer.await_args
     buttons = _callback_data_set(kwargs.get("reply_markup"))
     assert "start:profile" in buttons
-    assert "start:other" in buttons
+    assert "start:new" in buttons
+    assert "start:sessions" in buttons
+    assert "start:providers" in buttons
+    assert "start:help" in buttons
     assert "start:onboarding" not in buttons
 
 

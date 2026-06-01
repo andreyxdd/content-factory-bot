@@ -23,7 +23,7 @@ def _start_first_time_keyboard(lang: str) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=t("start_btn_onboarding", lang),
+                    text=f"🚀 {t('start_btn_onboarding', lang)}",
                     callback_data="start:onboarding",
                 )
             ]
@@ -36,16 +36,29 @@ def _start_returning_keyboard(lang: str) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=t("start_btn_profile", lang),
+                    text=f"⚙️ {t('start_btn_profile', lang)}",
                     callback_data="start:profile",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text=t("start_btn_other_commands", lang),
-                    callback_data="start:other",
+                    text=f"✍️ {t('start_btn_new', lang)}",
+                    callback_data="start:new",
                 )
             ],
+            [
+                InlineKeyboardButton(
+                    text=f"🗂️ {t('start_btn_sessions', lang)}",
+                    callback_data="start:sessions",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=f"🔌 {t('start_btn_providers', lang)}",
+                    callback_data="start:providers",
+                )
+            ],
+            [InlineKeyboardButton(text=f"❓ {t('start_btn_help', lang)}", callback_data="start:help")],
         ]
     )
 
@@ -53,19 +66,21 @@ def _start_returning_keyboard(lang: str) -> InlineKeyboardMarkup:
 def _start_other_commands_keyboard(lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=t("start_btn_new", lang), callback_data="start:new")],
+            [InlineKeyboardButton(text=f"✍️ {t('start_btn_new', lang)}", callback_data="start:new")],
             [
                 InlineKeyboardButton(
-                    text=t("start_btn_sessions", lang), callback_data="start:sessions"
+                    text=f"🗂️ {t('start_btn_sessions', lang)}",
+                    callback_data="start:sessions",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text=t("start_btn_providers", lang), callback_data="start:providers"
+                    text=f"🔌 {t('start_btn_providers', lang)}",
+                    callback_data="start:providers",
                 )
             ],
-            [InlineKeyboardButton(text=t("start_btn_help", lang), callback_data="start:help")],
-            [InlineKeyboardButton(text=t("start_btn_back", lang), callback_data="start:back")],
+            [InlineKeyboardButton(text=f"❓ {t('start_btn_help', lang)}", callback_data="start:help")],
+            [InlineKeyboardButton(text=f"⬅️ {t('start_btn_back', lang)}", callback_data="start:back")],
         ]
     )
 
