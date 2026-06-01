@@ -26,7 +26,13 @@ def _start_first_time_keyboard(lang: str) -> InlineKeyboardMarkup:
                     text=f"🚀 {t('start_btn_onboarding', lang)}",
                     callback_data="start:onboarding",
                 )
-            ]
+            ],
+            [
+                InlineKeyboardButton(
+                    text=f"🌐 {t('settings_language', lang)}",
+                    callback_data="start:settings",
+                )
+            ],
         ]
     )
 
@@ -141,6 +147,12 @@ async def on_start_menu(callback: CallbackQuery, state: FSMContext, **data) -> N
         from content_factory_bot.handlers.profile import cmd_profile
 
         await cmd_profile(callback.message, state, **data)  # type: ignore[arg-type]
+        await callback.answer()
+        return
+    if action == "settings":
+        from content_factory_bot.handlers.settings import cmd_settings
+
+        await cmd_settings(callback.message, **data)  # type: ignore[arg-type]
         await callback.answer()
         return
     if action == "other":

@@ -41,7 +41,7 @@ async def test_start_first_time_shows_only_onboarding_button() -> None:
 
     args, kwargs = message.answer.await_args
     buttons = _callback_data_set(kwargs.get("reply_markup"))
-    assert buttons == {"start:onboarding"}
+    assert buttons == {"start:onboarding", "start:settings"}
     assert args[0] == "Run /onboarding to set up your personal profile first."
 
 
