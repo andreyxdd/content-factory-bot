@@ -93,12 +93,18 @@ async def cmd_start(message: Message, **data) -> None:
     )
     async with session_scope() as session:
         ready = await is_profile_ready(session, uid)
-    hint = t("start_body", lang) if ready else t("start_need_onboarding", lang)
+    if not ready:
+        await message.answer(
+            t("start_need_onboarding", lang),
+            reply_markup=_start_first_time_keyboard(lang),
+        )
+        return
+
+    hint = t("start_body", lang)
     locale_hint = t("start_change_language_hint", lang)
-    kb = _start_returning_keyboard(lang) if ready else _start_first_time_keyboard(lang)
     await message.answer(
         f"{t('welcome', lang)}\n\n{detected}\n\n{hint}\n\n{locale_hint}",
-        reply_markup=kb,
+        reply_markup=_start_returning_keyboard(lang),
     )
 
 

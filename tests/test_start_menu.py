@@ -39,9 +39,10 @@ async def test_start_first_time_shows_only_onboarding_button() -> None:
     ):
         await cmd_start(message, **{UI_LANG_KEY: "en"})
 
-    _, kwargs = message.answer.await_args
+    args, kwargs = message.answer.await_args
     buttons = _callback_data_set(kwargs.get("reply_markup"))
     assert buttons == {"start:onboarding"}
+    assert args[0] == "Run /onboarding to set up your personal profile first."
 
 
 @pytest.mark.asyncio
