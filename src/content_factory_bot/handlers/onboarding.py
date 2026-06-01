@@ -268,15 +268,44 @@ def _question_text(step: str, lang: str) -> str:
     if lang == "ru":
         prompts = {
             "s1_ready": "Привет. За 20 минут пройдем 8 шагов и соберем System Prompt в твоем голосе. Готов начать?",
-            "s2_about": "Расскажи в 1-2 предложениях кто ты и чем занимаешься.",
+            "s2_about": (
+                "Расскажи в 1-2 предложениях кто ты и чем занимаешься.\n"
+                "Например: 'Я коуч по выгоранию для founder-ов B2B SaaS, веду\n"
+                "индивидуальные программы и групповые ретриты.'"
+            ),
             "s2_occupation": "Что лучше всего описывает чем ты занимаешься сейчас?",
-            "s2_audience": "Кому ты пишешь? Опиши конкретного человека: возраст, занятие, боль.",
-            "s2_platforms": "Где публикуешься или планируешь публиковаться? Назови все и основную платформу.",
+            "s2_audience": (
+                "Кому ты пишешь? Опиши их одним абзацем - кто, сколько лет, чем\n"
+                "заняты, что у них болит. Не 'все люди', а конкретный человек\n"
+                "в голове."
+            ),
+            "s2_platforms": (
+                "Где ты публикуешь сейчас или планируешь? Telegram / Instagram /\n"
+                "LinkedIn / Threads / блог - назови все. Если есть основная -\n"
+                "скажи какая."
+            ),
             "s2_voice_tone": "Какой тон тебе ближе в постах?",
             "s2_formats": "Какие форматы ты реально хочешь публиковать?",
             "s2_niche_topics": "Какой у тебя охват тем?",
-            "s2_reader_feel": "Что должен почувствовать читатель после поста?",
-            "s2_avoid_topics": "Каких тем или форматов ты точно избегаешь?",
+            "s2_goals": (
+                "Зачем тебе контент? Выбери ближайшее (можно несколько):\n"
+                "(a) продавать продукт/услугу\n"
+                "(b) собирать комьюнити\n"
+                "(c) строить личный бренд / экспертизу\n"
+                "(d) находить партнёров и нетворк\n"
+                "(e) другое - опиши"
+            ),
+            "s2_reader_feel": (
+                "Что должен почувствовать читатель после твоего поста? Например:\n"
+                "одни хотят чтобы читатель сказал 'я не один', другие - 'хочу\n"
+                "попробовать прямо сейчас', третьи - 'никогда так не думал'.\n"
+                "Можно своими словами."
+            ),
+            "s2_avoid_topics": (
+                "Каких тем или форматов ты избегаешь - что точно НЕ хочешь\n"
+                "публиковать? (Например: пустая мотивашка, FOMO ради продаж,\n"
+                "корпоративщина, политика, глубоко личное.)"
+            ),
             "s2_signature_themes": "Что стоит часто вплетать в посты?",
             "s2_personal_angle": "Что делает контент узнаваемо твоим?",
             "s2_human_design": "Используем ли Human Design как линзу в контенте?",
@@ -286,15 +315,47 @@ def _question_text(step: str, lang: str) -> str:
                 f"По умолчанию: {DEFAULT_ANTI_MARKERS_RU}\n"
                 "Отправь свой список через запятую или нажми «Пропустить» чтобы оставить дефолт."
             ),
-            "s3_samples": "Скинь 3-5 любимых постов: свои, чужие или микс. Можешь отправлять текст, форвард или ссылку.",
-            "s4_intro": "Стиль — половина голоса. Вторая половина — что у тебя в голове. 4 быстрых вопроса.",
-            "s4_beliefs": "Назови 2-3 убеждения в твоей сфере, которые ты считаешь верными, а мейнстрим — нет.",
-            "s4_contradictions": "Какие внутренние противоречия ты иногда проговариваешь вслух?",
-            "s4_boundaries": "О чем ты не пишешь публично, даже если есть мысли?",
-            "s4_evolution": "Как изменились твои взгляды за последние 1-2 года?",
-            "s5_intro": "Финальный смысловой слой. Два коротких вопроса.",
-            "s5_reader_phrase": "Какую одну фразу сказал бы идеальный читатель после твоего поста?",
-            "s5_voice_betrayal": "Какой пост ты не назвал бы своим, даже если он вирусный?",
+            "s3_samples": (
+                "Теперь самое интересное. Скинь мне 3-5 любимых постов.\n"
+                "Можно твоих (если уже пишешь). Можно чужих - на которые ты хочешь\n"
+                "быть похож. Можно микс. Просто вставь текст в чат."
+            ),
+            "s4_intro": (
+                "Стиль - это половина голоса. Вторая половина - что у тебя\n"
+                "в голове. Без этого AI будет писать стилистически похоже на тебя,\n"
+                "но содержательно мимо. 4 быстрых вопроса."
+            ),
+            "s4_beliefs": (
+                "Назови 2-3 убеждения в твоей сфере, которые ты считаешь правильными,\n"
+                "а большинство в индустрии - нет. Что-то спорное, неудобное, против\n"
+                "мейнстрима. Это твои опорные точки."
+            ),
+            "s4_contradictions": (
+                "Какие у тебя есть внутренние противоречия, которые ты иногда\n"
+                "проговариваешь вслух? Например: 'Я говорю что отдых важен, а сам\n"
+                "работаю по 12 часов.' Противоречия - это глубина, не слабость."
+            ),
+            "s4_boundaries": (
+                "О чём ты не пишешь публично, даже если есть мысли? Где границы?\n"
+                "(Личная жизнь, политика, цифры выручки, конкретные клиенты,\n"
+                "здоровье - что у тебя?)"
+            ),
+            "s4_evolution": (
+                "Какая у тебя была эволюция взгляда за последние 1-2 года? То, во что\n"
+                "ты раньше верил, а теперь нет. Или наоборот. Это сигнализирует\n"
+                "аудитории что ты живой человек, а не статуя."
+            ),
+            "s5_intro": "Финальный смысловой слой. Ответь на 2 коротких вопроса.",
+            "s5_reader_phrase": (
+                "Закрой глаза и представь идеального читателя. Он только что дочитал\n"
+                "твой пост. Какой одну фразу он сказал бы про себя или вслух?\n"
+                "('Я не один в этом', 'хочу попробовать завтра', 'никогда так не\n"
+                "думал', 'наконец кто-то это сказал', что-то своё.)"
+            ),
+            "s5_voice_betrayal": (
+                "Какой пост ты бы НЕ назвал своим, даже если бы он завирусился\n"
+                "на 100k просмотров? Что для тебя - предательство голоса?"
+            ),
             "toggle_warning": (
                 "Внимание: включение web_research и review_agent может увеличить расход AI-токенов и стоимость. "
                 "Можешь изменить это позже в /profile или /settings."
@@ -305,15 +366,44 @@ def _question_text(step: str, lang: str) -> str:
     else:
         prompts = {
             "s1_ready": "Hi. In ~20 minutes we will pass 8 steps and produce a System Prompt in your voice. Ready to start?",
-            "s2_about": "In 1-2 sentences, who are you and what do you do?",
+            "s2_about": (
+                "In 1-2 sentences, tell me who you are and what you do.\n"
+                "For example: ‘I’m a burnout coach for B2B SaaS founders, I run\n"
+                "1:1 programs and group retreats.’"
+            ),
             "s2_occupation": "What best describes what you do right now?",
-            "s2_audience": "Who do you write for? Describe one concrete person: age, role, pain.",
-            "s2_platforms": "Where do you publish or plan to publish? List all and mark the main one.",
+            "s2_audience": (
+                "Who do you write for? Describe them in one paragraph - who they are, age,\n"
+                "what they do, what hurts. Not ‘all people’, but one concrete person\n"
+                "in your head."
+            ),
+            "s2_platforms": (
+                "Where do you publish now or plan to publish? Telegram / Instagram /\n"
+                "LinkedIn / Threads / blog - list all. If there is a main one -\n"
+                "say which."
+            ),
             "s2_voice_tone": "What tone fits you best in posts?",
             "s2_formats": "What formats do you actually want to ship?",
             "s2_niche_topics": "How broad are your recurring topics?",
-            "s2_reader_feel": "What should the reader feel after your post?",
-            "s2_avoid_topics": "What topics or formats do you explicitly avoid?",
+            "s2_goals": (
+                "Why do you need content? Pick what fits most (multiple allowed):\n"
+                "(a) sell product/service\n"
+                "(b) build community\n"
+                "(c) build personal brand / authority\n"
+                "(d) find partners and network\n"
+                "(e) other - describe"
+            ),
+            "s2_reader_feel": (
+                "What should the reader feel after your post? For example:\n"
+                "some want the reader to say ‘I’m not alone’, others - ‘I want\n"
+                "to try this right now’, others - ‘I never thought of it this way’.\n"
+                "Use your own words."
+            ),
+            "s2_avoid_topics": (
+                "What topics or formats do you avoid - what do you definitely NOT want\n"
+                "to publish? (For example: empty motivation posts, FOMO for sales,\n"
+                "corporate-speak, politics, deeply personal.)"
+            ),
             "s2_signature_themes": "What themes should be woven into posts often?",
             "s2_personal_angle": "What makes your content unmistakably yours?",
             "s2_human_design": "Should Human Design be used as a content lens?",
@@ -323,15 +413,48 @@ def _question_text(step: str, lang: str) -> str:
                 f"Default: {DEFAULT_ANTI_MARKERS_EN}\n"
                 "Send your list comma-separated, or press Skip to keep default."
             ),
-            "s3_samples": "Send 3-5 favorite posts: yours, others, or mix. Text, forward, or link is fine.",
-            "s4_intro": "Style is half of voice. The other half is what is in your head. 4 quick questions.",
-            "s4_beliefs": "Name 2-3 contrarian beliefs in your domain.",
-            "s4_contradictions": "What inner contradictions do you sometimes say out loud?",
-            "s4_boundaries": "What do you avoid discussing publicly?",
-            "s4_evolution": "How did your view evolve in the last 1-2 years?",
-            "s5_intro": "Final semantic layer. Two short questions.",
-            "s5_reader_phrase": "What single phrase should the ideal reader say after reading your post?",
-            "s5_voice_betrayal": "What post would you call voice betrayal even if it went viral?",
+            "s3_samples": (
+                "Now the fun part. Send me 3-5 favorite posts.\n"
+                "They can be yours (if you already write). They can be others’ posts - the style you want\n"
+                "to sound like. Or a mix. Just paste text into chat."
+            ),
+            "s4_intro": (
+                "Style is half the voice. The other half is what’s in your head.\n"
+                "Without this, AI can sound stylistically like you,\n"
+                "but miss your substance. 4 quick questions."
+            ),
+            "s4_beliefs": (
+                "Name 2-3 beliefs in your field that you think are right,\n"
+                "while most of the industry disagrees. Something controversial, uncomfortable,\n"
+                "against mainstream. These are your anchor points."
+            ),
+            "s4_contradictions": (
+                "What internal contradictions do you have that you sometimes\n"
+                "say out loud? Example: ‘I say rest matters, but I\n"
+                "work 12 hours.’ Contradictions are depth, not weakness."
+            ),
+            "s4_boundaries": (
+                "What do you not write about publicly, even if you have thoughts?\n"
+                "Where are your boundaries?\n"
+                "(Personal life, politics, revenue numbers, specific clients,\n"
+                "health - what are yours?)"
+            ),
+            "s4_evolution": (
+                "What was your view evolution over the last 1-2 years? Something\n"
+                "you believed before, but not now. Or vice versa. This signals\n"
+                "to the audience that you’re a living human, not a statue."
+            ),
+            "s5_intro": "Final semantic layer. Answer 2 short questions.",
+            "s5_reader_phrase": (
+                "Close your eyes and imagine your ideal reader. They just finished\n"
+                "your post. What one phrase would they say to themselves or out loud?\n"
+                "(‘I’m not alone in this’, ‘I want to try tomorrow’, ‘I never thought\n"
+                "about it this way’, ‘finally someone said this’, or your own.)"
+            ),
+            "s5_voice_betrayal": (
+                "What post would you NOT call yours, even if it went viral\n"
+                "to 100k views? What is voice betrayal for you?"
+            ),
             "toggle_warning": (
                 "Warning: enabling web_research and review_agent may increase AI token usage and cost. "
                 "You can switch both later in /profile or /settings."
@@ -603,11 +726,7 @@ async def _send_prompt(target: Message, state: FSMContext, lang: str, step: str)
         return
     if step == "s2_goals":
         selected = set((await state.get_data()).get("goal_selected", []))
-        text = (
-            "Зачем тебе контент? Можно выбрать несколько и нажать «Готово»."
-            if lang == "ru"
-            else "Why do you need content now? You can select multiple and press Done."
-        )
+        text = _question_text("s2_goals", lang)
         goal_kb = _goal_kb(lang, selected)
         if step in SKIPPABLE_STEPS:
             goal_kb.inline_keyboard.insert(-1, _help_row(lang))
