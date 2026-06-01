@@ -93,7 +93,7 @@
   "providers_status_not_connected": "не подключён",
   "providers_skip": "Пропустить",
   "providers_skipped": "Каналы можно привязать через /providers. /new доступен после хотя бы одного подключения.",
-  "providers_tg_forward": "Перешлите пост из канала (бот должен быть админом).",
+  "providers_tg_forward": "Сначала добавьте бота админом в канал, затем перешлите сюда любой пост из этого канала.",
   "providers_tg_linked": "Канал привязан: {title}",
   "providers_tg_not_admin": "Бот должен быть админом канала. Добавьте бота и перешлите снова.",
   "providers_oauth_success": "<b>{provider}</b> подключён. /new — после привязки хотя бы одного канала.",

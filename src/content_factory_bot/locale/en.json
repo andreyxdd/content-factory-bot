@@ -93,7 +93,7 @@
   "providers_status_not_connected": "not connected",
   "providers_skip": "Skip for now",
   "providers_skipped": "You can link channels anytime with /providers. /new stays blocked until at least one is connected.",
-  "providers_tg_forward": "Forward any post from your channel here (bot must be admin).",
+  "providers_tg_forward": "Add the bot as an admin in your channel first, then forward any post from that channel here.",
   "providers_tg_linked": "Telegram channel linked: {title}",
   "providers_tg_not_admin": "Bot must be an admin in that channel. Add the bot, then forward again.",
   "providers_oauth_success": "<b>{provider}</b> connected. You can use /new when at least one channel is linked.",
