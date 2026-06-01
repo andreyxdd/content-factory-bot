@@ -104,6 +104,18 @@ _Avoid_: Research report, digest
 Chosen during `/new` **setup** (with web research toggle), before session input. When on, bot runs a **cover step** after draft text is confirmed and before publish. Off by default.
 _Avoid_: Thumbnail, image gen
 
+**Session setup**:
+The `/new` pre-start screen: toggles **web research** and **cover generation**, optional branch to set **session prompt addition**, then **Start**. No session row exists until Start. Choosing session instructions opens a short sub-flow (prompt → save text → return to this menu); toggles and Start stay on the same menu. `/cancel` during that sub-flow returns to the menu without clearing instructions already saved in setup FSM; use **Clear session instructions** on the menu to remove them.
+_Avoid_: Wizard step 1 (vague)
+
+**Creator prompt addition**:
+Optional text the Creator sets in `/settings`, appended to every **content session**'s writing system prompt under `# CREATOR ADDITIONS`. Persists until cleared. Max **2000** characters.
+_Avoid_: Global prompt, settings prompt
+
+**Session prompt addition**:
+Optional text set during **session setup** (via the session-instructions branch) for one **content session** only, appended under `# SESSION ADDITIONS` after **creator prompt addition**. Held in setup FSM until **Start** persists it on the session row; applies to all writing steps in that session (angles through publish prep). **Read-only after Start** — resume does not offer edit; new instructions require a new **content session**. Max **2000** characters (same cap as **creator prompt addition**).
+_Avoid_: Per-post note, session brief (that's **research brief**)
+
 **Session title**:
 Human-readable label for a content session, used in session lists and resume pickers.
 _Avoid_: Name, slug
