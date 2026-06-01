@@ -85,6 +85,32 @@ SKIPPABLE_STEPS = {
     "toggle_review",
 }
 
+ONBOARDING_FLOW = [
+    "s1_ready",
+    "s2_about",
+    "s2_audience",
+    "s2_platforms",
+    "s2_goals",
+    "s2_reader_feel",
+    "s2_avoid_topics",
+    "s2_anti_markers",
+    "s2_confirm",
+    "s3_samples",
+    "s3_confirm",
+    "s4_beliefs",
+    "s4_contradictions",
+    "s4_boundaries",
+    "s4_evolution",
+    "s4_confirm",
+    "s5_reader_phrase",
+    "s5_voice_betrayal",
+    "s6_confirm",
+    "toggle_research",
+    "toggle_review",
+    "done",
+]
+FLOW_INDEX = {step: idx for idx, step in enumerate(ONBOARDING_FLOW)}
+
 DEFAULT_ANTI_MARKERS_EN = (
     "in conclusion, it is important to note, in today's fast-paced world, unlock your potential"
 )
@@ -495,34 +521,10 @@ async def _send_prompt(target: Message, state: FSMContext, lang: str, step: str)
 
 
 def _next_step(step: str) -> str | None:
-    flow = [
-        "s1_ready",
-        "s2_about",
-        "s2_audience",
-        "s2_platforms",
-        "s2_goals",
-        "s2_reader_feel",
-        "s2_avoid_topics",
-        "s2_anti_markers",
-        "s2_confirm",
-        "s3_samples",
-        "s3_confirm",
-        "s4_beliefs",
-        "s4_contradictions",
-        "s4_boundaries",
-        "s4_evolution",
-        "s4_confirm",
-        "s5_reader_phrase",
-        "s5_voice_betrayal",
-        "s6_confirm",
-        "toggle_research",
-        "toggle_review",
-        "done",
-    ]
-    idx = flow.index(step)
-    if idx + 1 >= len(flow):
+    idx = ONBOARDING_FLOW.index(step)
+    if idx + 1 >= len(ONBOARDING_FLOW):
         return None
-    return flow[idx + 1]
+    return ONBOARDING_FLOW[idx + 1]
 
 
 def _save_text_key(step: str) -> str | None:
@@ -658,24 +660,38 @@ async def start_onboarding(
         )
     await state.set_state(OnboardingStates.in_progress)
     fsm = await state.get_data()
-    step = fsm.get("current_step")
-    if step:
-        await _send_prompt(target, state, lang, step)
-        return
+    fsm_step = fsm.get("current_step")
+    fsm_checkpoint = _checkpoint_step(fsm)
     async with session_scope() as session:
         answers = await get_profile_answers_map(session, uid)
-    if answers:
-        resume_step = _resume_step_from_answers(answers)
-        await state.update_data(
-            current_step=resume_step,
-            flow_stack=[],
-            answers=answers,
-            goal_selected=_goal_selection_from_answer(answers.get("s2_goals")),
-            samples=[],
-            pending_edit_key=None,
-            pending_edit_confirm_step=None,
+    db_step = _resume_step_from_answers(answers) if answers else None
+
+    resolved_step: str | None = None
+    if fsm_checkpoint and db_step:
+        resolved_step = (
+            fsm_checkpoint
+            if FLOW_INDEX.get(fsm_checkpoint, -1) >= FLOW_INDEX.get(db_step, -1)
+            else db_step
         )
-        await _send_prompt(target, state, lang, resume_step)
+    elif fsm_checkpoint:
+        resolved_step = fsm_checkpoint
+    elif db_step:
+        resolved_step = db_step
+    elif fsm_step:
+        resolved_step = fsm_step
+
+    if resolved_step:
+        update_payload: dict[str, object] = {
+            "current_step": resolved_step,
+            "pending_edit_key": None,
+            "pending_edit_confirm_step": None,
+        }
+        if answers:
+            update_payload["answers"] = answers
+            update_payload["goal_selected"] = _goal_selection_from_answer(answers.get("s2_goals"))
+            update_payload["samples"] = fsm.get("samples", [])
+        await state.update_data(**update_payload)
+        await _send_prompt(target, state, lang, resolved_step)
         return
     await state.update_data(
         current_step="s1_ready",

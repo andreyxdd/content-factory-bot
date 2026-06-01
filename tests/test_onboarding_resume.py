@@ -75,6 +75,44 @@ async def test_cmd_onboarding_resumes_from_saved_answers(mock_send_prompt: Async
 
 
 @pytest.mark.asyncio
+@patch("content_factory_bot.handlers.onboarding._send_prompt", new_callable=AsyncMock)
+async def test_cmd_onboarding_prefers_furthest_resume_step_over_stale_fsm(
+    mock_send_prompt: AsyncMock,
+) -> None:
+    message = AsyncMock()
+    message.from_user.id = 502
+    message.from_user.language_code = "en"
+    state = AsyncMock()
+    state.get_data = AsyncMock(return_value={"current_step": "s2_about", "answers": {}})
+
+    @asynccontextmanager
+    async def _session_scope():
+        yield MagicMock()
+
+    with (
+        patch("content_factory_bot.handlers.onboarding.session_scope", _session_scope),
+        patch("content_factory_bot.handlers.onboarding.ensure_creator", new_callable=AsyncMock),
+        patch(
+            "content_factory_bot.handlers.onboarding.get_profile_answers_map",
+            new_callable=AsyncMock,
+            return_value={
+                "s2_about": "Builder",
+                "s2_audience": "Founders",
+                "s2_platforms": "Telegram",
+                "s2_goals": "a,b",
+                "s2_reader_feel": "Relief",
+                "s2_avoid_topics": "Politics",
+            },
+        ),
+    ):
+        await cmd_onboarding(message, state, **{UI_LANG_KEY: "en"})
+
+    update_kwargs = state.update_data.await_args.kwargs
+    assert update_kwargs["current_step"] == "s2_anti_markers"
+    mock_send_prompt.assert_awaited_once_with(message, state, "en", "s2_anti_markers")
+
+
+@pytest.mark.asyncio
 async def test_cmd_onboarding_resume_s6_confirm_does_not_crash() -> None:
     message = AsyncMock()
     message.from_user.id = 777
