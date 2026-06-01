@@ -3,6 +3,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
+from content_factory_bot.db.models import Creator
 from content_factory_bot.db.session import session_scope
 from content_factory_bot.keyboards.draft import sessions_list_keyboard
 from content_factory_bot.locale.i18n import t
@@ -18,6 +19,10 @@ from content_factory_bot.services.profile import is_profile_ready
 router = Router(name="common")
 
 
+def _language_button_label(lang: str) -> str:
+    return t("settings_language", lang).removesuffix(":")
+
+
 def _start_first_time_keyboard(lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -29,7 +34,7 @@ def _start_first_time_keyboard(lang: str) -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text=f"🌐 {t('settings_language', lang)}",
+                    text=f"🌐 {_language_button_label(lang)}",
                     callback_data="start:settings",
                 )
             ],
@@ -91,8 +96,38 @@ def _start_other_commands_keyboard(lang: str) -> InlineKeyboardMarkup:
     )
 
 
+def _start_language_picker_keyboard(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=f"🇬🇧 {t('lang_en', lang)}", callback_data="start:setlang:en"),
+                InlineKeyboardButton(text=f"🇷🇺 {t('lang_ru', lang)}", callback_data="start:setlang:ru"),
+            ]
+        ]
+    )
+
+
 def _lang(message: Message, data: dict) -> str:
     return data.get(UI_LANG_KEY, "en")
+
+
+async def _start_message_payload(uid: int, lang: str) -> tuple[str, InlineKeyboardMarkup]:
+    async with session_scope() as session:
+        ready = await is_profile_ready(session, uid)
+    if not ready:
+        return t("start_need_onboarding", lang), _start_first_time_keyboard(lang)
+    detected = t("locale_detected_ru", lang) if lang == "ru" else t("locale_detected_en", lang)
+    hint = t("start_body", lang)
+    locale_hint = t("start_change_language_hint", lang)
+    text = f"{t('welcome', lang)}\n\n{detected}\n\n{hint}\n\n{locale_hint}"
+    return text, _start_returning_keyboard(lang)
+
+
+async def _set_creator_language(uid: int, lang: str) -> None:
+    async with session_scope() as session:
+        creator = await session.get(Creator, uid)
+        if creator:
+            creator.primary_language = lang
 
 
 @router.message(Command("start"))
@@ -108,25 +143,8 @@ async def cmd_start(message: Message, **data) -> None:
             telegram_user_id=uid,
             language_code=message.from_user.language_code,
         )
-
-    detected = (
-        t("locale_detected_ru", lang) if lang == "ru" else t("locale_detected_en", lang)
-    )
-    async with session_scope() as session:
-        ready = await is_profile_ready(session, uid)
-    if not ready:
-        await message.answer(
-            t("start_need_onboarding", lang),
-            reply_markup=_start_first_time_keyboard(lang),
-        )
-        return
-
-    hint = t("start_body", lang)
-    locale_hint = t("start_change_language_hint", lang)
-    await message.answer(
-        f"{t('welcome', lang)}\n\n{detected}\n\n{hint}\n\n{locale_hint}",
-        reply_markup=_start_returning_keyboard(lang),
-    )
+    text, kb = await _start_message_payload(uid, lang)
+    await message.answer(text, reply_markup=kb)
 
 
 @router.callback_query(F.data.startswith("start:"))
@@ -150,9 +168,21 @@ async def on_start_menu(callback: CallbackQuery, state: FSMContext, **data) -> N
         await callback.answer()
         return
     if action == "settings":
-        from content_factory_bot.handlers.settings import cmd_settings
-
-        await cmd_settings(callback.message, **data)  # type: ignore[arg-type]
+        await callback.message.edit_text(  # type: ignore[union-attr]
+            t("settings_language", lang),
+            reply_markup=_start_language_picker_keyboard(lang),
+        )
+        await callback.answer()
+        return
+    if action.startswith("setlang:"):
+        code = action.split(":", 1)[1]
+        if code not in ("en", "ru"):
+            await callback.answer()
+            return
+        if callback.from_user:
+            await _set_creator_language(callback.from_user.id, code)
+            text, kb = await _start_message_payload(callback.from_user.id, code)
+            await callback.message.edit_text(text, reply_markup=kb)  # type: ignore[union-attr]
         await callback.answer()
         return
     if action == "other":
