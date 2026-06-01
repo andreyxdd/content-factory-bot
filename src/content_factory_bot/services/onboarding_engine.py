@@ -11,6 +11,7 @@ S2_KEYS = (
     "s2_goals",
     "s2_reader_feel",
     "s2_avoid_topics",
+    "s2_anti_markers",
 )
 
 S4_KEYS = (
@@ -31,6 +32,7 @@ REQUIRED_KEYS = (
     "s2_audience",
     "s2_reader_feel",
     "s2_avoid_topics",
+    "s2_anti_markers",
     "s5_voice_betrayal",
 )
 
@@ -52,6 +54,7 @@ EDITABLE_FIELDS = (
     EditField("s2_goals", "Content goals", "Цели контента"),
     EditField("s2_reader_feel", "Reader feeling", "Эмоциональный эффект"),
     EditField("s2_avoid_topics", "Avoid topics", "Запретные темы"),
+    EditField("s2_anti_markers", "Anti-markers", "Анти-маркеры"),
     EditField("s4_beliefs", "Contrarian beliefs", "Опорные убеждения"),
     EditField("s4_contradictions", "Inner contradictions", "Противоречия"),
     EditField("s4_boundaries", "Public boundaries", "Границы публичности"),
@@ -85,6 +88,7 @@ def ordered_profile_keys() -> tuple[str, ...]:
         "s2_goals",
         "s2_reader_feel",
         "s2_avoid_topics",
+        "s2_anti_markers",
         "s4_beliefs",
         "s4_contradictions",
         "s4_boundaries",
@@ -167,9 +171,9 @@ def build_style_card(samples: list[str], lang: str) -> str:
     anti = []
     joined = " ".join(samples).lower()
     anti_candidates = (
-        ("важно отметить", "в заключение", "следует учитывать", "будущее за теми")
+        ("в заключение", "важно отметить", "в современном быстро меняющемся мире", "раскройте свой потенциал")
         if lang == "ru"
-        else ("important to note", "in conclusion", "it is important to consider", "the future belongs to those")
+        else ("in conclusion", "it is important to note", "in today's fast-paced world", "unlock your potential")
     )
     for phrase in anti_candidates:
         if phrase not in joined:
@@ -234,7 +238,8 @@ def build_s2_summary(answers: dict[str, str], lang: str) -> str:
             f"• Платформы: {answers.get('s2_platforms', '—')}\n"
             f"• Цели: {answers.get('s2_goals', '—')}\n"
             f"• Что должен почувствовать читатель: {answers.get('s2_reader_feel', '—')}\n"
-            f"• Что не публикуете: {answers.get('s2_avoid_topics', '—')}"
+            f"• Что не публикуете: {answers.get('s2_avoid_topics', '—')}\n"
+            f"• Анти-маркеры: {answers.get('s2_anti_markers', '—')}"
         )
     return (
         "PROFILE CARD\n"
@@ -243,7 +248,8 @@ def build_s2_summary(answers: dict[str, str], lang: str) -> str:
         f"• Platforms: {answers.get('s2_platforms', '—')}\n"
         f"• Goals: {answers.get('s2_goals', '—')}\n"
         f"• Reader should feel: {answers.get('s2_reader_feel', '—')}\n"
-        f"• Topics to avoid: {answers.get('s2_avoid_topics', '—')}"
+        f"• Topics to avoid: {answers.get('s2_avoid_topics', '—')}\n"
+        f"• Anti-markers: {answers.get('s2_anti_markers', '—')}"
     )
 
 
@@ -305,7 +311,7 @@ def build_system_prompt(
             "# ЭМОЦИОНАЛЬНЫЙ ОТПЕЧАТОК\n"
             f"{answers.get('s2_reader_feel', '—')}\n\n"
             "# АНТИ-МАРКЕРЫ — ЧТО НИКОГДА НЕ ПИСАТЬ\n"
-            f"{answers.get('s2_avoid_topics', '—')}\n\n"
+            f"{answers.get('s2_anti_markers', '—')}\n\n"
             "# ФИНАЛЬНАЯ ПРОВЕРКА ПЕРЕД ВЫДАЧЕЙ\n"
             f"{tribal_block}\n"
         )
@@ -327,7 +333,7 @@ def build_system_prompt(
         "# EMOTIONAL IMPRINT\n"
         f"{answers.get('s2_reader_feel', '—')}\n\n"
         "# ANTI-MARKERS - NEVER WRITE\n"
-        f"{answers.get('s2_avoid_topics', '—')}\n\n"
+        f"{answers.get('s2_anti_markers', '—')}\n\n"
         "# FINAL CHECK BEFORE OUTPUT\n"
         f"{tribal_block}\n"
     )

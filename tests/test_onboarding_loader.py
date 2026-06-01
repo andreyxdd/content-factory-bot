@@ -7,6 +7,7 @@ def test_required_answers_include_toggles() -> None:
     assert "s2_audience" in required
     assert "s2_reader_feel" in required
     assert "s2_avoid_topics" in required
+    assert "s2_anti_markers" in required
     assert "s5_voice_betrayal" in required
     assert "web_research" not in required
     assert "review_agent" not in required

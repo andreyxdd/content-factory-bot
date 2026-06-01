@@ -16,3 +16,13 @@ def test_help_text_for_contrarian_beliefs_present_in_both_locales() -> None:
     assert "большинство" in ru
     assert "microservices" in en
     assert "big headcount" in en
+
+
+def test_anti_markers_question_contains_default_phrase() -> None:
+    en = _question_text("s2_anti_markers", "en").lower()
+    assert "it is important to note" in en
+    assert "in conclusion" in en
+
+    ru = _question_text("s2_anti_markers", "ru").lower()
+    assert "важно отметить" in ru
+    assert "в заключение" in ru

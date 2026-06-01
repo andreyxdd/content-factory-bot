@@ -43,6 +43,7 @@ TEXT_STEP_BY_KEY = {
     "s2_platforms": "s2_platforms",
     "s2_reader_feel": "s2_reader_feel",
     "s2_avoid_topics": "s2_avoid_topics",
+    "s2_anti_markers": "s2_anti_markers",
     "s4_beliefs": "s4_beliefs",
     "s4_contradictions": "s4_contradictions",
     "s4_boundaries": "s4_boundaries",
@@ -58,6 +59,7 @@ RESUME_STEP_ORDER = (
     ("s2_goals", "s2_goals"),
     ("s2_reader_feel", "s2_reader_feel"),
     ("s2_avoid_topics", "s2_avoid_topics"),
+    ("s2_anti_markers", "s2_anti_markers"),
     ("s4_beliefs", "s4_beliefs"),
     ("s4_contradictions", "s4_contradictions"),
     ("s4_boundaries", "s4_boundaries"),
@@ -71,6 +73,7 @@ RESUME_STEP_ORDER = (
 SKIPPABLE_STEPS = {
     "s2_platforms",
     "s2_goals",
+    "s2_anti_markers",
     "s3_samples",
     "s4_beliefs",
     "s4_contradictions",
@@ -80,6 +83,17 @@ SKIPPABLE_STEPS = {
     "toggle_research",
     "toggle_review",
 }
+
+DEFAULT_ANTI_MARKERS_EN = (
+    "in conclusion, it is important to note, in today's fast-paced world, unlock your potential"
+)
+DEFAULT_ANTI_MARKERS_RU = (
+    "в заключение, важно отметить, в современном быстро меняющемся мире, раскройте свой потенциал"
+)
+
+
+def _default_anti_markers(lang: str) -> str:
+    return DEFAULT_ANTI_MARKERS_RU if lang == "ru" else DEFAULT_ANTI_MARKERS_EN
 
 
 def _lang(data: dict) -> str:
@@ -150,6 +164,11 @@ def _question_text(step: str, lang: str) -> str:
             "s2_platforms": "Где публикуешься или планируешь публиковаться? Назови все и основную платформу.",
             "s2_reader_feel": "Что должен почувствовать читатель после поста?",
             "s2_avoid_topics": "Каких тем или форматов ты точно избегаешь?",
+            "s2_anti_markers": (
+                "АНТИ-МАРКЕРЫ: что никогда не писать дословно?\n"
+                f"По умолчанию: {DEFAULT_ANTI_MARKERS_RU}\n"
+                "Отправь свой список через запятую или нажми «Пропустить» чтобы оставить дефолт."
+            ),
             "s3_samples": "Скинь 3-5 любимых постов: свои, чужие или микс. Можешь отправлять текст, форвард или ссылку.",
             "s4_intro": "Стиль — половина голоса. Вторая половина — что у тебя в голове. 4 быстрых вопроса.",
             "s4_beliefs": "Назови 2-3 убеждения в твоей сфере, которые ты считаешь верными, а мейнстрим — нет.",
@@ -174,6 +193,11 @@ def _question_text(step: str, lang: str) -> str:
             "s2_platforms": "Where do you publish or plan to publish? List all and mark the main one.",
             "s2_reader_feel": "What should the reader feel after your post?",
             "s2_avoid_topics": "What topics or formats do you explicitly avoid?",
+            "s2_anti_markers": (
+                "ANTI-MARKERS: what phrases should never appear verbatim?\n"
+                f"Default: {DEFAULT_ANTI_MARKERS_EN}\n"
+                "Send your list comma-separated, or press Skip to keep default."
+            ),
             "s3_samples": "Send 3-5 favorite posts: yours, others, or mix. Text, forward, or link is fine.",
             "s4_intro": "Style is half of voice. The other half is what is in your head. 4 quick questions.",
             "s4_beliefs": "Name 2-3 contrarian beliefs in your domain.",
@@ -202,6 +226,7 @@ def _help_text(step: str, lang: str) -> str:
         "s2_goals",
         "s2_reader_feel",
         "s2_avoid_topics",
+        "s2_anti_markers",
         "s2_confirm",
         "s3_samples",
         "s3_confirm",
@@ -225,6 +250,10 @@ def _help_text(step: str, lang: str) -> str:
             "s2_goals": "Зачем тебе контент сейчас. Выбери несколько пунктов и нажми «Готово».",
             "s2_reader_feel": "Какое чувство должен получить читатель. Пример: «Ясность, спокойствие и импульс действовать».",
             "s2_avoid_topics": "Темы и форматы, которые ты не публикуешь. Пример: «Политика, токсичный хейт, кликбейт».",
+            "s2_anti_markers": (
+                "Фразы-штампы, которые нельзя писать дословно. "
+                "Можно оставить дефолт кнопкой «Пропустить» или отправить свой список через запятую."
+            ),
             "s2_confirm": "Проверь карточку. Можно: подтвердить, продолжить дальше, выбрать поле для правки или прислать правку текстом.",
             "s3_samples": "Пришли 3-5 образцов: текст, форвард или ссылка. Когда хватит — «Анализировать образцы» или «Пропустить пока».",
             "s3_confirm": "Это черновой style card по образцам. Если не похоже на тебя, напиши корректировку.",
@@ -255,6 +284,10 @@ def _help_text(step: str, lang: str) -> str:
             "s2_goals": "Why you need content now. Select multiple options, then press Done.",
             "s2_reader_feel": "What feeling the reader should leave with. Example: \"Clarity, relief, and motivation to act.\"",
             "s2_avoid_topics": "Topics/formats you never publish. Example: \"Politics, rage-bait, manipulative clickbait.\"",
+            "s2_anti_markers": (
+                "Banned cliche phrases you do not want verbatim. "
+                "Press Skip to keep default, or send a custom comma-separated list."
+            ),
             "s2_confirm": "Review your profile card. You can confirm, continue, edit a field, or send free-text correction.",
             "s3_samples": "Send 3-5 samples: text, forward, or links. Then press Analyze samples or Skip for now.",
             "s3_confirm": "This is a draft style card from your samples. If it misses your voice, send corrections.",
@@ -456,6 +489,7 @@ def _next_step(step: str) -> str | None:
         "s2_goals",
         "s2_reader_feel",
         "s2_avoid_topics",
+        "s2_anti_markers",
         "s2_confirm",
         "s3_samples",
         "s3_confirm",
@@ -687,6 +721,11 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
                 answers["s2_goals"] = ""
                 await state.update_data(answers=answers, goal_selected=[])
                 await _persist_answer(uid, "s2_goals", "", None)
+            elif step == "s2_anti_markers":
+                default_anti_markers = _default_anti_markers(lang)
+                answers["s2_anti_markers"] = default_anti_markers
+                await state.update_data(answers=answers)
+                await _persist_answer(uid, "s2_anti_markers", default_anti_markers, None)
             else:
                 key = _save_text_key(step)
                 if key:

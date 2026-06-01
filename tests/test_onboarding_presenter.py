@@ -18,6 +18,7 @@ def test_build_s2_summary_contains_expected_fields() -> None:
             "s2_goals": "a,c",
             "s2_reader_feel": "I am not alone",
             "s2_avoid_topics": "politics",
+            "s2_anti_markers": "important to note, in conclusion",
         },
         "en",
     )
@@ -31,19 +32,25 @@ def test_build_style_card_empty_samples_safe() -> None:
 
 
 def test_build_system_prompt_includes_tribal_and_values() -> None:
-    answers = {"s2_about": "I am a creator", "s2_audience": "Founders", "s2_platforms": "Telegram"}
+    answers = {
+        "s2_about": "I am a creator",
+        "s2_audience": "Founders",
+        "s2_platforms": "Telegram",
+        "s2_anti_markers": "important to note, in conclusion",
+    }
     values = build_values_block({"s4_beliefs": "Slow is smooth"}, "en")
     tribal = build_tribal_block({"s5_reader_phrase": "I should try this"}, "en")
     prompt = build_system_prompt(answers, "STYLE", values, tribal, "en")
     assert "I am a creator" in prompt
     assert "STYLE" in prompt
     assert "FINAL CHECK BEFORE OUTPUT" in prompt
+    assert "important to note, in conclusion" in prompt
 
 
 def test_en_style_card_has_no_cyrillic_antimarkers() -> None:
     text = build_style_card(["I ship fast and iterate weekly."], "en")
     assert re.search(r"[А-Яа-яЁё]", text) is None
-    assert "important to note" in text or "in conclusion" in text
+    assert "it is important to note" in text or "in conclusion" in text
 
 
 def test_ru_style_card_and_prompt_have_no_english_template_headers() -> None:
