@@ -35,8 +35,7 @@ async def _send_creator_message(
 
 
 def _angle_message(angle: AngleOption, lang: str) -> str:
-    sep = "═" * 43
-    return f"{sep}\n{angle.display_block(lang)}\n{sep}"
+    return angle.display_block(lang)
 
 
 async def deliver_angle_round(

@@ -124,21 +124,18 @@ class AngleOption:
     preview: str
 
     def display_block(self, lang: str) -> str:
-        fmt_label = self.format
-        sep = "─" * 41
+        """Telegram HTML (bot default parse_mode=HTML)."""
+        from content_factory_bot.locale.telegram_html import escape_html
+
+        aid = escape_html(self.id.upper())
+        fmt = escape_html(self.format)
+        hook = escape_html(self.hook.strip())
+        preview = escape_html(self.preview.strip())
         if lang == "ru":
-            return (
-                f"УГОЛ {self.id} — {fmt_label}\n"
-                f"{sep}\n"
-                f"HOOK: {self.hook}\n\n"
-                f"{self.preview}"
-            )
-        return (
-            f"ANGLE {self.id} — {fmt_label}\n"
-            f"{sep}\n"
-            f"HOOK: {self.hook}\n\n"
-            f"{self.preview}"
-        )
+            heading = f"<b>Угол {aid} · {fmt}</b>"
+        else:
+            heading = f"<b>Angle {aid} · {fmt}</b>"
+        return f"{heading}\n\n<b>{hook}</b>\n\n{preview}"
 
 
 def _parse_angles(raw: str) -> list[AngleOption]:
