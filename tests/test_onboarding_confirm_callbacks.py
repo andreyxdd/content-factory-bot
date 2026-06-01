@@ -2,7 +2,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from content_factory_bot.handlers.onboarding import on_onboarding_callback, on_onboarding_text
+from content_factory_bot.handlers.onboarding import (
+    _show_confirm_blocks,
+    on_onboarding_callback,
+    on_onboarding_text,
+)
 from content_factory_bot.middleware.locale import UI_LANG_KEY
 
 
@@ -122,3 +126,19 @@ async def test_nav_cancel_pauses_and_moves_to_latest_confirm_checkpoint() -> Non
     state.update_data.assert_awaited_once_with(current_step="s3_confirm")
     args, _ = callback.message.answer.await_args
     assert "Onboarding paused" in args[0]
+
+
+@pytest.mark.asyncio
+async def test_s6_confirm_shows_export_hint_without_full_prompt_dump() -> None:
+    message = AsyncMock()
+    state = AsyncMock()
+    state.get_data = AsyncMock(return_value={"answers": {}, "system_prompt_text": "X" * 6000})
+
+    await _show_confirm_blocks(message, state, "s6_confirm", "en")
+
+    first_args, _ = message.answer.await_args_list[0]
+    second_args, second_kwargs = message.answer.await_args_list[1]
+    assert first_args[0] == "System Prompt is ready and saved."
+    assert "/export_system_prompt" in second_args[0]
+    callbacks = _callback_data_set(second_kwargs["reply_markup"])
+    assert "onb:s6_confirm:ok" in callbacks

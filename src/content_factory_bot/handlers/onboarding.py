@@ -838,11 +838,17 @@ async def _show_confirm_blocks(message: Message, state: FSMContext, step: str, l
         text = fsm.get("values_block_text", "")
         help_text = "Это про тебя?" if lang == "ru" else "Is this about you?"
     else:
-        text = fsm.get("system_prompt_text", "")
-        help_text = (
-            "Готово. Сохранить, перейти к тесту (опционально) и финальным настройкам?"
+        text = (
+            "System Prompt готов и сохранён."
             if lang == "ru"
-            else "Done. Save, move to optional test handoff, then final settings?"
+            else "System Prompt is ready and saved."
+        )
+        help_text = (
+            "Чтобы получить полный текст .md файлом, используй /export_system_prompt. "
+            "Продолжаем к тесту (опционально) и финальным настройкам?"
+            if lang == "ru"
+            else "To get full text as .md, use /export_system_prompt. "
+            "Continue to optional test handoff and final settings?"
         )
     await message.answer(text)
     await message.answer(help_text, reply_markup=_confirm_kb(step, lang))
