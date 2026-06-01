@@ -401,14 +401,13 @@ def _ready_kb(lang: str) -> InlineKeyboardMarkup:
 
 def _confirm_kb(kind: str, lang: str) -> InlineKeyboardMarkup:
     if lang == "ru":
-        ok, edit, next_text = "Похоже", "Редактировать поле", "Дальше"
+        ok, edit = "Похоже", "Редактировать поле"
     else:
-        ok, edit, next_text = "Looks right", "Edit field", "Continue"
+        ok, edit = "Continue", "Edit field"
     return _kb(
         [
             [InlineKeyboardButton(text=ok, callback_data=f"onb:{kind}:ok")],
             [InlineKeyboardButton(text=edit, callback_data=f"onb:{kind}:edit")],
-            [InlineKeyboardButton(text=next_text, callback_data=f"onb:{kind}:next")],
         ],
         lang,
     )
