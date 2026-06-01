@@ -314,7 +314,10 @@ def _help_text(step: str, lang: str) -> str:
             "s5_reader_phrase": "Одна фраза, которую должен сказать идеальный читатель после поста. Пример: «Это прямо про меня».",
             "s5_voice_betrayal": "Какой пост был бы «не твоим голосом», даже если вирусный. Пример: «Манипулятивный хайп без пользы».",
             "s6_confirm": "Это собранный system prompt. Проверь и продолжай к финальным переключателям.",
-            "toggle_research": "Включает веб-исследование в новых сессиях по умолчанию. Можно менять позже в /profile или /settings.",
+            "toggle_research": (
+                "Включает веб-исследование перед черновиками: бот соберёт короткий brief по актуальным трендам и источникам из живого веба. "
+                "Можно менять позже в /profile или /settings."
+            ),
             "toggle_review": "Включает review-agent для черновиков по умолчанию. Можно менять позже.",
             "fallback": "Правила: один вопрос за раз. Можно нажимать кнопки или отвечать текстом. «Назад» возвращает к прошлому шагу.",
         }
@@ -348,7 +351,10 @@ def _help_text(step: str, lang: str) -> str:
             "s5_reader_phrase": "One line your ideal reader should say after a post. Example: \"This finally put my thoughts in order.\"",
             "s5_voice_betrayal": "What kind of post would betray your voice, even if viral. Example: \"Hypey manipulation with no substance.\"",
             "s6_confirm": "This is your assembled system prompt. Review it, then continue to final toggles.",
-            "toggle_research": "Enables web research by default in new sessions. You can change this later in /profile or /settings.",
+            "toggle_research": (
+                "Enables pre-draft web research: the bot builds a short brief with current trends and sources from the live web. "
+                "You can change this later in /profile or /settings."
+            ),
             "toggle_review": "Enables review-agent by default for drafts. You can change this later.",
             "fallback": "Rules: one question at a time. Use buttons or text replies. Back returns to the previous step.",
         }

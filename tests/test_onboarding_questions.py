@@ -26,3 +26,12 @@ def test_anti_markers_question_contains_default_phrase() -> None:
     ru = _question_text("s2_anti_markers", "ru").lower()
     assert "важно отметить" in ru
     assert "в заключение" in ru
+
+
+def test_toggle_research_help_explains_live_web_brief() -> None:
+    en = _help_text("toggle_research", "en").lower()
+    ru = _help_text("toggle_research", "ru").lower()
+    assert "live web" in en
+    assert "brief" in en
+    assert "живого веба" in ru
+    assert "brief" in ru
