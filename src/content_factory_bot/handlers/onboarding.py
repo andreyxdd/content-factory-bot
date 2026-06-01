@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 
 import httpx
@@ -110,6 +111,8 @@ ONBOARDING_FLOW = [
     "done",
 ]
 FLOW_INDEX = {step: idx for idx, step in enumerate(ONBOARDING_FLOW)}
+SAMPLES_DB_KEY = "s3_samples"
+STYLE_CARD_DB_KEY = "s3_style_card"
 
 DEFAULT_ANTI_MARKERS_EN = (
     "in conclusion, it is important to note, in today's fast-paced world, unlock your potential"
@@ -664,7 +667,25 @@ async def start_onboarding(
     fsm_checkpoint = _checkpoint_step(fsm)
     async with session_scope() as session:
         answers = await get_profile_answers_map(session, uid)
-    db_step = _resume_step_from_answers(answers) if answers else None
+    samples_from_db: list[str] = []
+    style_card_from_db = ""
+    db_step = None
+    if answers:
+        raw_samples = answers.get(SAMPLES_DB_KEY)
+        if raw_samples:
+            try:
+                parsed = json.loads(raw_samples)
+                if isinstance(parsed, list):
+                    samples_from_db = [str(item) for item in parsed if isinstance(item, str) and item.strip()]
+            except Exception:
+                samples_from_db = []
+        style_card_from_db = (answers.get(STYLE_CARD_DB_KEY) or "").strip()
+        if style_card_from_db:
+            db_step = "s3_confirm"
+        elif samples_from_db:
+            db_step = "s3_samples"
+        else:
+            db_step = _resume_step_from_answers(answers)
 
     resolved_step: str | None = None
     if fsm_checkpoint and db_step:
@@ -689,7 +710,9 @@ async def start_onboarding(
         if answers:
             update_payload["answers"] = answers
             update_payload["goal_selected"] = _goal_selection_from_answer(answers.get("s2_goals"))
-            update_payload["samples"] = fsm.get("samples", [])
+            update_payload["samples"] = fsm.get("samples", []) or samples_from_db
+            if style_card_from_db:
+                update_payload["style_card_text"] = style_card_from_db
         await state.update_data(**update_payload)
         await _send_prompt(target, state, lang, resolved_step)
         return
@@ -748,6 +771,7 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
                 return
             if step == "s3_samples":
                 style_card = build_style_card([], lang)
+                await _persist_answer(uid, STYLE_CARD_DB_KEY, style_card, None)
                 await state.update_data(
                     style_card_text=style_card,
                     current_step="s3_confirm",
@@ -869,6 +893,7 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
     if parts[1] == "sample":
         if parts[2] == "skip":
             style_card = build_style_card([], lang)
+            await _persist_answer(uid, STYLE_CARD_DB_KEY, style_card, None)
             await state.update_data(style_card_text=style_card, current_step="s3_confirm", flow_stack=list(fsm.get("flow_stack", [])) + ["s3_samples"])
             await _show_confirm_blocks(callback.message, state, "s3_confirm", lang)
             await callback.answer()
@@ -876,6 +901,7 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
         if parts[2] == "analyze":
             samples = list(fsm.get("samples", []))
             style_card = build_style_card(samples, lang)
+            await _persist_answer(uid, STYLE_CARD_DB_KEY, style_card, None)
             await state.update_data(style_card_text=style_card, current_step="s3_confirm", flow_stack=list(fsm.get("flow_stack", [])) + ["s3_samples"])
             await _show_confirm_blocks(callback.message, state, "s3_confirm", lang)
             await callback.answer()
@@ -977,6 +1003,7 @@ async def on_onboarding_text(message: Message, state: FSMContext, **data) -> Non
         else:
             samples.append(text)
         await state.update_data(samples=samples)
+        await _persist_answer(uid, SAMPLES_DB_KEY, json.dumps(samples, ensure_ascii=False), None)
         ack = f"Образец сохранен ({len(samples)})." if lang == "ru" else f"Sample saved ({len(samples)})."
         await message.answer(ack, reply_markup=_sample_actions_kb(lang, include_skip=False))
         return

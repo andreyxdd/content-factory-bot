@@ -83,7 +83,8 @@ async def test_pending_edit_returns_to_origin_confirm(
 
 
 @pytest.mark.asyncio
-async def test_s3_sample_saved_ack_includes_analyze_button() -> None:
+@patch("content_factory_bot.handlers.onboarding._persist_answer", new_callable=AsyncMock)
+async def test_s3_sample_saved_ack_includes_analyze_button(_mock_persist: AsyncMock) -> None:
     message = AsyncMock()
     message.from_user.id = 21
     message.text = "Some sample post"
