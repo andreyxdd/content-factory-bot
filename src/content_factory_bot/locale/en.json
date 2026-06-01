@@ -102,6 +102,8 @@
   "sessions_empty": "No sessions yet. Use /new.",
   "sessions_list": "Your sessions — ▶ resume, 🗑 delete:",
   "session_delete_btn": "🗑",
+  "session_untitled": "Untitled",
+  "session_delete_confirm": "Delete this session?\n\n<b>{title}</b>\n#{id} · {state}",
   "session_delete_yes": "Delete",
   "session_delete_no": "Cancel",
   "session_deleted": "Session removed.",

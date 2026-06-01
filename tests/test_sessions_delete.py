@@ -6,6 +6,7 @@ from content_factory_bot.keyboards.draft import (
     session_delete_confirm_keyboard,
     sessions_list_keyboard,
 )
+from content_factory_bot.handlers.content_session import _session_delete_confirm_text
 from content_factory_bot.services.content_session import (
     delete_session,
     list_recent_sessions,
@@ -42,6 +43,16 @@ def test_sessions_list_keyboard_has_delete_callback() -> None:
     row = kb.inline_keyboard[0]
     assert row[0].callback_data == "cs:resume:1"
     assert row[1].callback_data == "cs:del:1"
+
+
+@pytest.mark.asyncio
+async def test_session_delete_confirm_text_includes_title(db_session: AsyncSession) -> None:
+    row = await start_session(db_session, 5, web_research=False, cover_generation=False)
+    row.title = "My draft post"
+    await db_session.commit()
+    text = _session_delete_confirm_text(row, "en")
+    assert "My draft post" in text
+    assert f"#{row.id}" in text
 
 
 def test_session_delete_confirm_keyboard() -> None:

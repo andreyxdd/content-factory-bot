@@ -7,7 +7,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from content_factory_bot.config import get_settings
-from content_factory_bot.db.models import Creator
+from content_factory_bot.db.models import ContentSession, Creator
 from content_factory_bot.db.session import session_scope
 from content_factory_bot.keyboards.draft import (
     draft_options_keyboard,
@@ -30,6 +30,7 @@ from content_factory_bot.services.linear_session_handler import (
     handle_tribal_feedback_text,
 )
 from content_factory_bot.locale.i18n import t
+from content_factory_bot.locale.telegram_html import escape_html
 from content_factory_bot.middleware.locale import UI_LANG_KEY
 from content_factory_bot.services.content_session import (
     aggregate_input_text,
@@ -396,6 +397,15 @@ async def _run_drafts(
     )
 
 
+def _session_delete_confirm_text(row: ContentSession, lang: str) -> str:
+    raw_title = (row.title or "").strip() or t("session_untitled", lang)
+    return t("session_delete_confirm", lang).format(
+        title=escape_html(raw_title[:80]),
+        id=row.id,
+        state=escape_html(row.state),
+    )
+
+
 async def _refresh_sessions_list_message(
     callback: CallbackQuery, uid: int, lang: str
 ) -> None:
@@ -448,8 +458,9 @@ async def on_session_callback(callback: CallbackQuery, state: FSMContext, **data
                 await callback.answer(t("session_not_found", lang), show_alert=True)
                 return
         if callback.message:
-            await callback.message.edit_reply_markup(
-                reply_markup=session_delete_confirm_keyboard(sid, lang)
+            await callback.message.edit_text(
+                _session_delete_confirm_text(row, lang),
+                reply_markup=session_delete_confirm_keyboard(sid, lang),
             )
         await callback.answer()
         return

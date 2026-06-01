@@ -102,6 +102,8 @@
   "sessions_empty": "Сессий пока нет. /new",
   "sessions_list": "Ваши сессии — ▶ продолжить, 🗑 удалить:",
   "session_delete_btn": "🗑",
+  "session_untitled": "Без названия",
+  "session_delete_confirm": "Удалить эту сессию?\n\n<b>{title}</b>\n#{id} · {state}",
   "session_delete_yes": "Удалить",
   "session_delete_no": "Отмена",
   "session_deleted": "Сессия удалена.",
