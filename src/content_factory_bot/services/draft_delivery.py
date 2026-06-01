@@ -1,6 +1,8 @@
 """Deliver angle round / legacy draft round UI to Creator."""
 
-from aiogram.types import Message
+from __future__ import annotations
+
+from aiogram.types import InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from content_factory_bot.db.models import Creator
@@ -11,6 +13,30 @@ from content_factory_bot.services.draft import AngleOption
 from content_factory_bot.services.profile import format_profile_summary
 from content_factory_bot.services.review import ReviewStep
 from content_factory_bot.services.telegram_notify import notify_creator, notify_creator_markup
+
+
+async def _send_creator_message(
+    *,
+    telegram_user_id: int,
+    text: str,
+    message: Message | None,
+    reply_markup: InlineKeyboardMarkup | None = None,
+) -> None:
+    if message is not None:
+        if reply_markup is not None:
+            await message.answer(text, reply_markup=reply_markup)
+        else:
+            await message.answer(text)
+        return
+    if reply_markup is not None:
+        await notify_creator_markup(telegram_user_id, text, reply_markup)
+    else:
+        await notify_creator(telegram_user_id, text)
+
+
+def _angle_message(angle: AngleOption, lang: str) -> str:
+    sep = "═" * 43
+    return f"{sep}\n{angle.display_block(lang)}\n{sep}"
 
 
 async def deliver_angle_round(
@@ -31,22 +57,31 @@ async def deliver_angle_round(
             review_text = await ReviewStep().critique(
                 draft_options=opts, profile_summary=profile, lang=lang
             )
-            if message is not None:
-                await message.answer(review_text)
-            else:
-                await notify_creator(telegram_user_id, review_text)
+            await _send_creator_message(
+                telegram_user_id=telegram_user_id,
+                text=review_text,
+                message=message,
+            )
         except Exception:
             pass
 
-    blocks = "\n\n".join(
-        f"{'═' * 43}\n{a.display_block(lang)}\n{'═' * 43}" for a in angles
+    await _send_creator_message(
+        telegram_user_id=telegram_user_id,
+        text=t("session_angles_intro", lang),
+        message=message,
     )
-    body = f"{t('session_angles_intro', lang)}\n\n{blocks}\n\n{t('session_pick_angle', lang)}"
-    markup = angle_choice_keyboard(session_id, lang)
-    if message is not None:
-        await message.answer(body, reply_markup=markup)
-    else:
-        await notify_creator_markup(telegram_user_id, body, markup)
+    for angle in angles[:3]:
+        await _send_creator_message(
+            telegram_user_id=telegram_user_id,
+            text=_angle_message(angle, lang),
+            message=message,
+        )
+    await _send_creator_message(
+        telegram_user_id=telegram_user_id,
+        text=t("session_pick_angle", lang),
+        message=message,
+        reply_markup=angle_choice_keyboard(session_id, lang),
+    )
 
 
 async def deliver_draft_round(
@@ -67,16 +102,19 @@ async def deliver_draft_round(
             review_text = await ReviewStep().critique(
                 draft_options=options, profile_summary=profile, lang=lang
             )
-            if message is not None:
-                await message.answer(review_text)
-            else:
-                await notify_creator(telegram_user_id, review_text)
+            await _send_creator_message(
+                telegram_user_id=telegram_user_id,
+                text=review_text,
+                message=message,
+            )
         except Exception:
             pass
 
     body = t("session_pick_draft", lang)
     markup = draft_options_keyboard(session_id, round_no, options, lang)
-    if message is not None:
-        await message.answer(body, reply_markup=markup)
-    else:
-        await notify_creator_markup(telegram_user_id, body, markup)
+    await _send_creator_message(
+        telegram_user_id=telegram_user_id,
+        text=body,
+        message=message,
+        reply_markup=markup,
+    )
