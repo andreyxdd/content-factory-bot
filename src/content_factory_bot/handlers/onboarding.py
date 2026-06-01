@@ -43,6 +43,14 @@ TEXT_STEP_BY_KEY = {
     "s2_about": "s2_about",
     "s2_audience": "s2_audience",
     "s2_platforms": "s2_platforms",
+    "s2_occupation": "occupation",
+    "s2_voice_tone": "voice_tone",
+    "s2_formats": "formats",
+    "s2_niche_topics": "niche_topics",
+    "s2_signature_themes": "signature_themes",
+    "s2_personal_angle": "personal_angle",
+    "s2_human_design": "human_design",
+    "s2_cadence": "cadence",
     "s2_reader_feel": "s2_reader_feel",
     "s2_avoid_topics": "s2_avoid_topics",
     "s2_anti_markers": "s2_anti_markers",
@@ -56,11 +64,22 @@ TEXT_STEP_BY_KEY = {
 
 RESUME_STEP_ORDER = (
     ("s2_about", "s2_about"),
+    ("occupation", "s2_occupation"),
     ("s2_audience", "s2_audience"),
+    ("audience", "s2_audience"),
     ("s2_platforms", "s2_platforms"),
+    ("voice_tone", "s2_voice_tone"),
+    ("formats", "s2_formats"),
+    ("niche_topics", "s2_niche_topics"),
     ("s2_goals", "s2_goals"),
+    ("content_goals", "s2_goals"),
+    ("signature_themes", "s2_signature_themes"),
+    ("personal_angle", "s2_personal_angle"),
+    ("human_design", "s2_human_design"),
+    ("cadence", "s2_cadence"),
     ("s2_reader_feel", "s2_reader_feel"),
     ("s2_avoid_topics", "s2_avoid_topics"),
+    ("hard_limits", "s2_avoid_topics"),
     ("s2_anti_markers", "s2_anti_markers"),
     ("s4_beliefs", "s4_beliefs"),
     ("s4_contradictions", "s4_contradictions"),
@@ -89,9 +108,17 @@ SKIPPABLE_STEPS = {
 ONBOARDING_FLOW = [
     "s1_ready",
     "s2_about",
+    "s2_occupation",
     "s2_audience",
     "s2_platforms",
+    "s2_voice_tone",
+    "s2_formats",
+    "s2_niche_topics",
     "s2_goals",
+    "s2_signature_themes",
+    "s2_personal_angle",
+    "s2_human_design",
+    "s2_cadence",
     "s2_reader_feel",
     "s2_avoid_topics",
     "s2_anti_markers",
@@ -106,6 +133,7 @@ ONBOARDING_FLOW = [
     "s5_reader_phrase",
     "s5_voice_betrayal",
     "s6_confirm",
+    "s7_handoff",
     "toggle_research",
     "toggle_review",
     "done",
@@ -126,6 +154,22 @@ def _default_anti_markers(lang: str) -> str:
     return DEFAULT_ANTI_MARKERS_RU if lang == "ru" else DEFAULT_ANTI_MARKERS_EN
 
 
+def _primary_language_value(lang: str) -> tuple[str, int]:
+    return ("Русский", 1) if lang == "ru" else ("English", 0)
+
+
+def _reaction_text(lang: str) -> str:
+    return "Принял. Двигаемся дальше." if lang == "ru" else "Got it. Moving to next question."
+
+
+def _alias_mappings() -> dict[str, str]:
+    return {
+        "s2_audience": "audience",
+        "s2_goals": "content_goals",
+        "s2_avoid_topics": "hard_limits",
+    }
+
+
 def _lang(data: dict) -> str:
     return data.get(UI_LANG_KEY, "en")
 
@@ -136,13 +180,23 @@ def _yes_set(lang: str) -> set[str]:
 
 def _checkpoint_step(fsm: dict) -> str | None:
     answers = fsm.get("answers", {})
+    profile_checkpoint_keys = set(S2_KEYS) | {
+        "occupation",
+        "voice_tone",
+        "formats",
+        "niche_topics",
+        "signature_themes",
+        "personal_angle",
+        "human_design",
+        "cadence",
+    }
     if fsm.get("system_prompt_text"):
         return "s6_confirm"
     if fsm.get("values_block_text"):
         return "s4_confirm"
     if fsm.get("style_card_text"):
         return "s3_confirm"
-    if all(key in answers for key in S2_KEYS):
+    if all(key in answers for key in profile_checkpoint_keys):
         return "s2_confirm"
     return None
 
@@ -198,15 +252,35 @@ def _sample_actions_kb(lang: str, *, include_skip: bool) -> InlineKeyboardMarkup
     return _kb(rows, lang)
 
 
+def _s7_handoff_kb(lang: str) -> InlineKeyboardMarkup:
+    start = "Перейти к /new" if lang == "ru" else "Go to /new"
+    skip = "Пропустить тест" if lang == "ru" else "Skip test"
+    return _kb(
+        [
+            [InlineKeyboardButton(text=start, callback_data="onb:s7:new")],
+            [InlineKeyboardButton(text=skip, callback_data="onb:s7:skip")],
+        ],
+        lang,
+    )
+
+
 def _question_text(step: str, lang: str) -> str:
     if lang == "ru":
         prompts = {
             "s1_ready": "Привет. За 20 минут пройдем 8 шагов и соберем System Prompt в твоем голосе. Готов начать?",
             "s2_about": "Расскажи в 1-2 предложениях кто ты и чем занимаешься.",
+            "s2_occupation": "Что лучше всего описывает чем ты занимаешься сейчас?",
             "s2_audience": "Кому ты пишешь? Опиши конкретного человека: возраст, занятие, боль.",
             "s2_platforms": "Где публикуешься или планируешь публиковаться? Назови все и основную платформу.",
+            "s2_voice_tone": "Какой тон тебе ближе в постах?",
+            "s2_formats": "Какие форматы ты реально хочешь публиковать?",
+            "s2_niche_topics": "Какой у тебя охват тем?",
             "s2_reader_feel": "Что должен почувствовать читатель после поста?",
             "s2_avoid_topics": "Каких тем или форматов ты точно избегаешь?",
+            "s2_signature_themes": "Что стоит часто вплетать в посты?",
+            "s2_personal_angle": "Что делает контент узнаваемо твоим?",
+            "s2_human_design": "Используем ли Human Design как линзу в контенте?",
+            "s2_cadence": "Какой ритм публикаций реалистичен для тебя?",
             "s2_anti_markers": (
                 "АНТИ-МАРКЕРЫ: что никогда не писать дословно?\n"
                 f"По умолчанию: {DEFAULT_ANTI_MARKERS_RU}\n"
@@ -232,10 +306,18 @@ def _question_text(step: str, lang: str) -> str:
         prompts = {
             "s1_ready": "Hi. In ~20 minutes we will pass 8 steps and produce a System Prompt in your voice. Ready to start?",
             "s2_about": "In 1-2 sentences, who are you and what do you do?",
+            "s2_occupation": "What best describes what you do right now?",
             "s2_audience": "Who do you write for? Describe one concrete person: age, role, pain.",
             "s2_platforms": "Where do you publish or plan to publish? List all and mark the main one.",
+            "s2_voice_tone": "What tone fits you best in posts?",
+            "s2_formats": "What formats do you actually want to ship?",
+            "s2_niche_topics": "How broad are your recurring topics?",
             "s2_reader_feel": "What should the reader feel after your post?",
             "s2_avoid_topics": "What topics or formats do you explicitly avoid?",
+            "s2_signature_themes": "What themes should be woven into posts often?",
+            "s2_personal_angle": "What makes your content unmistakably yours?",
+            "s2_human_design": "Should Human Design be used as a content lens?",
+            "s2_cadence": "What posting cadence is realistic for you?",
             "s2_anti_markers": (
                 "ANTI-MARKERS: what phrases should never appear verbatim?\n"
                 f"Default: {DEFAULT_ANTI_MARKERS_EN}\n"
@@ -264,9 +346,17 @@ def _help_text(step: str, lang: str) -> str:
     key = step if step in {
         "s1_ready",
         "s2_about",
+        "s2_occupation",
         "s2_audience",
         "s2_platforms",
+        "s2_voice_tone",
+        "s2_formats",
+        "s2_niche_topics",
         "s2_goals",
+        "s2_signature_themes",
+        "s2_personal_angle",
+        "s2_human_design",
+        "s2_cadence",
         "s2_reader_feel",
         "s2_avoid_topics",
         "s2_anti_markers",
@@ -288,9 +378,17 @@ def _help_text(step: str, lang: str) -> str:
         texts = {
             "s1_ready": "Коротко: онбординг собирает твой голос и настройки. Нажми «Продолжить», чтобы начать.",
             "s2_about": "Кто ты и чем занимаешься сейчас. Пример: «Я product engineer, строю AI-инструменты для авторов».",
+            "s2_occupation": "Роль одним предложением. Пример: «Founder / builder», «Эксперт / практик», «Креатор».",
             "s2_audience": "Опиши одного типичного читателя: роль, уровень, боль. Пример: «PM 28 лет, тонет в хаосе задач».",
             "s2_platforms": "Где публикуешься и что главное. Пример: «Telegram и LinkedIn, основной канал — Telegram».",
+            "s2_voice_tone": "Тон голоса. Пример: «Прямо, без воды» или «Тепло, по-человечески».",
+            "s2_formats": "Формат публикаций. Пример: «Короткие посты и треды».",
+            "s2_niche_topics": "Покрытие тем. Пример: «2-3 связанные темы».",
             "s2_goals": "Зачем тебе контент сейчас. Выбери несколько пунктов и нажми «Готово».",
+            "s2_signature_themes": "Что часто вплетать. Пример: «Личные истории + практический how-to».",
+            "s2_personal_angle": "Твой уникальный угол. Пример: «Свой фреймворк и мой карьерный путь».",
+            "s2_human_design": "Можно написать «нет» или указать тип/роль, если хочешь учитывать это в контенте.",
+            "s2_cadence": "Реалистичная частота публикаций. Пример: «Несколько раз в неделю».",
             "s2_reader_feel": "Какое чувство должен получить читатель. Пример: «Ясность, спокойствие и импульс действовать».",
             "s2_avoid_topics": "Темы и форматы, которые ты не публикуешь. Пример: «Политика, токсичный хейт, кликбейт».",
             "s2_anti_markers": (
@@ -325,9 +423,17 @@ def _help_text(step: str, lang: str) -> str:
         texts = {
             "s1_ready": "Short version: onboarding captures your voice and defaults. Press Continue to start.",
             "s2_about": "Who you are and what you do now. Example: \"I am a product engineer building AI tools for creators.\"",
+            "s2_occupation": "Role in one line. Example: \"Founder / builder\", \"Expert / practitioner\", \"Creator\".",
             "s2_audience": "Describe one concrete reader: role, level, pain. Example: \"28-year-old PM drowning in task chaos.\"",
             "s2_platforms": "Where you publish and which one is primary. Example: \"Telegram and LinkedIn; main channel is Telegram.\"",
+            "s2_voice_tone": "Voice tone. Example: \"Direct, no fluff\" or \"Warm, conversational\".",
+            "s2_formats": "Publishing formats. Example: \"Short posts and threads\".",
+            "s2_niche_topics": "Topic breadth. Example: \"2-3 connected themes\".",
             "s2_goals": "Why you need content now. Select multiple options, then press Done.",
+            "s2_signature_themes": "What to weave in often. Example: \"Personal stories + actionable how-to\".",
+            "s2_personal_angle": "Your unique angle. Example: \"My own framework and career arc\".",
+            "s2_human_design": "You can answer \"no\" or provide type/lens if this should influence content.",
+            "s2_cadence": "Realistic publishing cadence. Example: \"Few times per week\".",
             "s2_reader_feel": "What feeling the reader should leave with. Example: \"Clarity, relief, and motivation to act.\"",
             "s2_avoid_topics": "Topics/formats you never publish. Example: \"Politics, rage-bait, manipulative clickbait.\"",
             "s2_anti_markers": (
@@ -472,7 +578,15 @@ async def _return_to_confirm(message: Message, state: FSMContext, lang: str, con
     if confirm_step == "s4_confirm":
         updates["values_block_text"] = build_values_block(answers, lang)
     if confirm_step == "s6_confirm":
-        style = fsm.get("style_card_text", build_style_card([], lang))
+        style = fsm.get(
+            "style_card_text",
+            build_style_card(
+                [],
+                lang,
+                avoid_topics=answers.get("s2_avoid_topics", ""),
+                anti_markers=answers.get("s2_anti_markers", ""),
+            ),
+        )
         values = build_values_block(answers, lang)
         tribal = build_tribal_block(answers, lang)
         updates["values_block_text"] = values
@@ -525,6 +639,14 @@ async def _send_prompt(target: Message, state: FSMContext, lang: str, step: str)
         toggle_kb.inline_keyboard[-1] = _nav_row(lang, include_skip=True)
         await target.answer(_question_text(step, lang), reply_markup=toggle_kb)
         return
+    if step == "s7_handoff":
+        text = (
+            "Теперь проверим в деле. Можешь сразу перейти в /new и дать короткую мысль для поста, или пропустить этот тест."
+            if lang == "ru"
+            else "Now we test in action. You can jump to /new with a short idea for a post, or skip this test."
+        )
+        await target.answer(text, reply_markup=_s7_handoff_kb(lang))
+        return
     await target.answer(_question_text(step, lang), reply_markup=_optional_text_kb(step, lang))
 
 
@@ -569,6 +691,13 @@ async def _persist_answer(uid: int, key: str, value: str, option_index: int | No
         )
 
 
+async def _persist_alias_if_needed(uid: int, source_key: str, value: str) -> None:
+    alias = _alias_mappings().get(source_key)
+    if not alias:
+        return
+    await _persist_answer(uid, alias, value, None)
+
+
 async def _show_confirm_blocks(message: Message, state: FSMContext, step: str, lang: str) -> None:
     fsm = await state.get_data()
     answers = fsm.get("answers", {})
@@ -592,9 +721,9 @@ async def _show_confirm_blocks(message: Message, state: FSMContext, step: str, l
     else:
         text = fsm.get("system_prompt_text", "")
         help_text = (
-            "Готово. Сохранить и переходить к настройкам?"
+            "Готово. Сохранить, перейти к тесту (опционально) и финальным настройкам?"
             if lang == "ru"
-            else "Done. Save and move to settings toggles?"
+            else "Done. Save, move to optional test handoff, then final settings?"
         )
     await message.answer(text)
     await message.answer(help_text, reply_markup=_confirm_kb(step, lang))
@@ -602,7 +731,21 @@ async def _show_confirm_blocks(message: Message, state: FSMContext, step: str, l
 
 async def _finish_onboarding(message: Message, state: FSMContext, uid: int, lang: str) -> None:
     fsm = await state.get_data()
+    answers = dict(fsm.get("answers", {}))
+    if "primary_language" not in answers:
+        lang_value, _ = _primary_language_value(lang)
+        answers["primary_language"] = lang_value
+        await state.update_data(answers=answers)
     async with session_scope() as session:
+        lang_value, lang_option = _primary_language_value(lang)
+        await save_answer(
+            session,
+            uid,
+            "primary_language",
+            answers.get("primary_language", lang_value),
+            option_index=lang_option,
+            is_custom=False,
+        )
         await apply_creator_preferences(session, uid)
         await save_profile_artifacts(
             session,
@@ -614,9 +757,17 @@ async def _finish_onboarding(message: Message, state: FSMContext, uid: int, lang
         )
         await mark_profile_ready(session, uid)
     done_text = (
-        "Онбординг завершен. Профиль готов. Дальше подключи каналы и переходи в /new."
+        "Готово. У тебя есть 3 артефакта:\n\n"
+        "1. STYLE CARD — сохрани отдельно.\n"
+        "2. SYSTEM PROMPT — вставь в Claude Project / ChatGPT Custom Instructions / Gemini Gem.\n"
+        "3. ПЕРВЫЙ ПОСТ — можешь публиковать как есть или допилить руками.\n\n"
+        "Дальше подключи каналы и переходи в /new."
         if lang == "ru"
-        else "Onboarding complete. Profile is ready. Connect channels and continue in /new."
+        else "Done. You have 3 artifacts:\n\n"
+        "1. STYLE CARD - save it separately.\n"
+        "2. SYSTEM PROMPT - paste into Claude Project / ChatGPT Custom Instructions / Gemini Gem.\n"
+        "3. FIRST POST - publish as is or polish manually.\n\n"
+        "Next: connect channels and continue in /new."
     )
     await message.answer(done_text)
     await send_providers_screen(message, lang=lang, uid=uid, show_skip=True)
@@ -672,6 +823,9 @@ async def start_onboarding(
     fsm_checkpoint = _checkpoint_step(fsm)
     async with session_scope() as session:
         answers = await get_profile_answers_map(session, uid)
+    if "primary_language" not in answers:
+        lang_value, _ = _primary_language_value(lang)
+        answers["primary_language"] = lang_value
     samples_from_db: list[str] = []
     style_card_from_db = ""
     db_step = None
@@ -775,7 +929,12 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
                 )
                 return
             if step == "s3_samples":
-                style_card = build_style_card([], lang)
+                style_card = build_style_card(
+                    [],
+                    lang,
+                    avoid_topics=fsm.get("answers", {}).get("s2_avoid_topics", ""),
+                    anti_markers=fsm.get("answers", {}).get("s2_anti_markers", ""),
+                )
                 await _persist_answer(uid, STYLE_CARD_DB_KEY, style_card, None)
                 await state.update_data(
                     style_card_text=style_card,
@@ -786,6 +945,7 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
                 await callback.answer()
                 return
             if step == "toggle_research":
+                await _persist_answer(uid, "web_research", "Yes", 0)
                 await state.update_data(
                     current_step="toggle_review",
                     flow_stack=list(fsm.get("flow_stack", [])) + ["toggle_research"],
@@ -794,6 +954,7 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
                 await callback.answer()
                 return
             if step == "toggle_review":
+                await _persist_answer(uid, "review_agent", "Yes", 0)
                 await state.update_data(current_step="done")
                 await _finish_onboarding(callback.message, state, uid, lang)
                 await callback.answer()
@@ -804,6 +965,7 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
                 answers["s2_goals"] = ""
                 await state.update_data(answers=answers, goal_selected=[])
                 await _persist_answer(uid, "s2_goals", "", None)
+                await _persist_alias_if_needed(uid, "s2_goals", "")
             elif step == "s2_anti_markers":
                 default_anti_markers = _default_anti_markers(lang)
                 answers["s2_anti_markers"] = default_anti_markers
@@ -815,6 +977,7 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
                     answers[key] = ""
                     await state.update_data(answers=answers)
                     await _persist_answer(uid, key, "", None)
+                    await _persist_alias_if_needed(uid, key, "")
             next_step = _next_step(step)
             if next_step is None:
                 await callback.answer()
@@ -829,7 +992,15 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
                 await state.update_data(values_block_text=values_block)
                 await _show_confirm_blocks(callback.message, state, "s4_confirm", lang)
             elif next_step == "s6_confirm":
-                style = fsm.get("style_card_text", build_style_card([], lang))
+                style = fsm.get(
+                    "style_card_text",
+                    build_style_card(
+                        [],
+                        lang,
+                        avoid_topics=answers.get("s2_avoid_topics", ""),
+                        anti_markers=answers.get("s2_anti_markers", ""),
+                    ),
+                )
                 values = fsm.get("values_block_text", build_values_block(answers, lang))
                 tribal = build_tribal_block(answers, lang)
                 system_prompt = build_system_prompt(answers, style, values, tribal, lang)
@@ -872,6 +1043,7 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
             answers["s2_goals"] = goal_text
             await state.update_data(answers=answers)
             await _persist_answer(uid, "s2_goals", goal_text, None)
+            await _persist_alias_if_needed(uid, "s2_goals", goal_text)
             pending_edit = fsm.get("pending_edit_key")
             pending_confirm = fsm.get("pending_edit_confirm_step")
             if pending_edit == "s2_goals" and pending_confirm:
@@ -882,6 +1054,7 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
                 await callback.message.answer("Опиши «другое» коротко." if lang == "ru" else "Describe your 'other' goal briefly.")
                 await callback.answer()
                 return
+            await callback.message.answer(_reaction_text(lang))
             await state.update_data(flow_stack=list(fsm.get("flow_stack", [])) + ["s2_goals"], current_step="s2_reader_feel")
             await _send_prompt(callback.message, state, lang, "s2_reader_feel")
             await callback.answer()
@@ -897,7 +1070,12 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
 
     if parts[1] == "sample":
         if parts[2] == "skip":
-            style_card = build_style_card([], lang)
+            style_card = build_style_card(
+                [],
+                lang,
+                avoid_topics=fsm.get("answers", {}).get("s2_avoid_topics", ""),
+                anti_markers=fsm.get("answers", {}).get("s2_anti_markers", ""),
+            )
             await _persist_answer(uid, STYLE_CARD_DB_KEY, style_card, None)
             await state.update_data(style_card_text=style_card, current_step="s3_confirm", flow_stack=list(fsm.get("flow_stack", [])) + ["s3_samples"])
             await _show_confirm_blocks(callback.message, state, "s3_confirm", lang)
@@ -905,10 +1083,33 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
             return
         if parts[2] == "analyze":
             samples = list(fsm.get("samples", []))
-            style_card = build_style_card(samples, lang)
+            style_card = build_style_card(
+                samples,
+                lang,
+                avoid_topics=fsm.get("answers", {}).get("s2_avoid_topics", ""),
+                anti_markers=fsm.get("answers", {}).get("s2_anti_markers", ""),
+            )
             await _persist_answer(uid, STYLE_CARD_DB_KEY, style_card, None)
             await state.update_data(style_card_text=style_card, current_step="s3_confirm", flow_stack=list(fsm.get("flow_stack", [])) + ["s3_samples"])
             await _show_confirm_blocks(callback.message, state, "s3_confirm", lang)
+            await callback.answer()
+            return
+
+    if parts[1] == "s7":
+        if parts[2] == "new":
+            msg = (
+                "Отлично. Открой /new и отправь короткую мысль — сделаем 3 разных угла."
+                if lang == "ru"
+                else "Great. Open /new and send a short thought - we will generate 3 different angles."
+            )
+            await callback.message.answer(msg)
+            await state.update_data(current_step="toggle_research", flow_stack=list(fsm.get("flow_stack", [])) + ["s7_handoff"])
+            await _send_prompt(callback.message, state, lang, "toggle_research")
+            await callback.answer()
+            return
+        if parts[2] == "skip":
+            await state.update_data(current_step="toggle_research", flow_stack=list(fsm.get("flow_stack", [])) + ["s7_handoff"])
+            await _send_prompt(callback.message, state, lang, "toggle_research")
             await callback.answer()
             return
 
@@ -1019,6 +1220,7 @@ async def on_onboarding_text(message: Message, state: FSMContext, **data) -> Non
         answers["s2_goals"] = merged
         await state.update_data(answers=answers)
         await _persist_answer(uid, "s2_goals", merged, None)
+        await _persist_alias_if_needed(uid, "s2_goals", merged)
         pending_edit = fsm.get("pending_edit_key")
         pending_confirm = fsm.get("pending_edit_confirm_step")
         if pending_edit == "s2_goals" and pending_confirm:
@@ -1038,11 +1240,13 @@ async def on_onboarding_text(message: Message, state: FSMContext, **data) -> Non
         answers[key] = text
         await state.update_data(answers=answers)
         await _persist_answer(uid, key, text, None)
+        await _persist_alias_if_needed(uid, key, text)
         pending_edit = fsm.get("pending_edit_key")
         if pending_edit:
             confirm_step = fsm.get("pending_edit_confirm_step", "s2_confirm")
             await _return_to_confirm(message, state, lang, confirm_step)
             return
+        await message.answer(_reaction_text(lang))
         next_step = _next_step(step)
         if next_step == "s2_confirm":
             await state.update_data(current_step="s2_confirm", flow_stack=list(fsm.get("flow_stack", [])) + [step])
@@ -1054,7 +1258,15 @@ async def on_onboarding_text(message: Message, state: FSMContext, **data) -> Non
             await _show_confirm_blocks(message, state, "s4_confirm", lang)
             return
         if next_step == "s6_confirm":
-            style = fsm.get("style_card_text", build_style_card([], lang))
+            style = fsm.get(
+                "style_card_text",
+                build_style_card(
+                    [],
+                    lang,
+                    avoid_topics=answers.get("s2_avoid_topics", ""),
+                    anti_markers=answers.get("s2_anti_markers", ""),
+                ),
+            )
             values = fsm.get("values_block_text", build_values_block(answers, lang))
             tribal = build_tribal_block(answers, lang)
             system_prompt = build_system_prompt(answers, style, values, tribal, lang)

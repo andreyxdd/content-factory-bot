@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 import re
 
@@ -27,13 +28,37 @@ S5_KEYS = (
 )
 
 TOGGLE_KEYS = ("web_research", "review_agent")
+YAML_REQUIRED_KEYS = (
+    "primary_language",
+    "occupation",
+    "content_goals",
+    "audience",
+    "voice_tone",
+    "formats",
+    "niche_topics",
+    "hard_limits",
+    "signature_themes",
+    "personal_angle",
+    "human_design",
+    "cadence",
+)
 REQUIRED_KEYS = (
     "s2_about",
     "s2_audience",
+    "s2_goals",
+    "s2_platforms",
     "s2_reader_feel",
     "s2_avoid_topics",
     "s2_anti_markers",
+    "s4_beliefs",
+    "s4_contradictions",
+    "s4_boundaries",
+    "s4_evolution",
+    "s5_reader_phrase",
     "s5_voice_betrayal",
+    "web_research",
+    "review_agent",
+    *YAML_REQUIRED_KEYS,
 )
 
 
@@ -82,13 +107,25 @@ def required_answer_keys() -> set[str]:
 
 def ordered_profile_keys() -> tuple[str, ...]:
     return (
+        "primary_language",
         "s2_about",
+        "occupation",
         "s2_audience",
+        "audience",
         "s2_platforms",
         "s2_goals",
+        "content_goals",
+        "voice_tone",
+        "formats",
+        "niche_topics",
         "s2_reader_feel",
         "s2_avoid_topics",
+        "hard_limits",
         "s2_anti_markers",
+        "signature_themes",
+        "personal_angle",
+        "human_design",
+        "cadence",
         "s4_beliefs",
         "s4_contradictions",
         "s4_boundaries",
@@ -111,7 +148,13 @@ def _guess_person(samples: list[str], lang: str) -> str:
     return "Смешанный" if lang == "ru" else "Mixed"
 
 
-def build_style_card(samples: list[str], lang: str) -> str:
+def build_style_card(
+    samples: list[str],
+    lang: str,
+    *,
+    avoid_topics: str = "",
+    anti_markers: str = "",
+) -> str:
     if not samples:
         if lang == "ru":
             return (
@@ -134,8 +177,8 @@ def build_style_card(samples: list[str], lang: str) -> str:
                 "  • Личные триггеры: не выделены\n"
                 "  • Пунктуация: не определена\n\n"
                 "АНТИ-МАРКЕРЫ\n"
-                "  • Никогда не пиши: уточните после примеров\n"
-                "  • Темы избегаю: см. шаг 2.6"
+                f"  • Никогда не пиши: {anti_markers or 'уточните после примеров'}\n"
+                f"  • Темы избегаю: {avoid_topics or 'см. шаг 2.6'}"
             )
         return (
             "VOICE\n"
@@ -157,8 +200,8 @@ def build_style_card(samples: list[str], lang: str) -> str:
             "  • Personal triggers: not detected\n"
             "  • Punctuation traits: not detected\n\n"
             "ANTI-MARKERS\n"
-            "  • Never write: refine after samples\n"
-            "  • Avoid topics: see step 2.6"
+            f"  • Never write: {anti_markers or 'refine after samples'}\n"
+            f"  • Avoid topics: {avoid_topics or 'see step 2.6'}"
         )
 
     person = _guess_person(samples, lang)
@@ -178,7 +221,9 @@ def build_style_card(samples: list[str], lang: str) -> str:
     for phrase in anti_candidates:
         if phrase not in joined:
             anti.append(phrase)
-    anti_text = ", ".join(anti[:4]) if anti else ("общие ИИ-штампы" if lang == "ru" else "generic AI fillers")
+    anti_text = anti_markers or (
+        ", ".join(anti[:4]) if anti else ("общие ИИ-штампы" if lang == "ru" else "generic AI fillers")
+    )
 
     if lang == "ru":
         return (
@@ -193,7 +238,8 @@ def build_style_card(samples: list[str], lang: str) -> str:
             f"  • Финал: открытый вопрос или вывод\n\n"
             f"РИТМ\n"
             f"  • Динамичность: средняя\n"
-            f"  • Соло-абзац как акцент: иногда\n\n"
+            f"  • Соло-абзац как акцент: иногда\n"
+            f"  • Списки: текстовые без буллетов\n\n"
             f"ЛЕКСИКА\n"
             f"  • Регистр: гибрид\n"
             f"  • Мат: точечно или нет\n"
@@ -202,7 +248,7 @@ def build_style_card(samples: list[str], lang: str) -> str:
             f"  • Пунктуация: тире/скобки по месту\n\n"
             f"АНТИ-МАРКЕРЫ\n"
             f"  • Никогда не пиши: {anti_text}\n"
-            f"  • Темы избегаю: из шага 2.6"
+            f"  • Темы избегаю: {avoid_topics or 'из шага 2.6'}"
         )
     return (
         f"VOICE\n"
@@ -216,7 +262,8 @@ def build_style_card(samples: list[str], lang: str) -> str:
         f"  • Ending: open question or punchline\n\n"
         f"RHYTHM\n"
         f"  • Burstiness: medium\n"
-        f"  • Solo sentence emphasis: sometimes\n\n"
+        f"  • Solo sentence emphasis: sometimes\n"
+        f"  • Lists: plain-text lists\n\n"
         f"LEXICON\n"
         f"  • Register: hybrid\n"
         f"  • Profanity: sparse or none\n"
@@ -225,7 +272,7 @@ def build_style_card(samples: list[str], lang: str) -> str:
         f"  • Punctuation traits: dash/parentheses when useful\n\n"
         f"ANTI-MARKERS\n"
         f"  • Never write: {anti_text}\n"
-        f"  • Avoid topics: from step 2.6"
+        f"  • Avoid topics: {avoid_topics or 'from step 2.6'}"
     )
 
 
@@ -234,9 +281,17 @@ def build_s2_summary(answers: dict[str, str], lang: str) -> str:
         return (
             "ПРОФИЛЬ-КАРТОЧКА\n"
             f"• Кто вы: {answers.get('s2_about', '—')}\n"
+            f"• Роль: {answers.get('occupation', '—')}\n"
             f"• Аудитория: {answers.get('s2_audience', '—')}\n"
             f"• Платформы: {answers.get('s2_platforms', '—')}\n"
+            f"• Тон: {answers.get('voice_tone', '—')}\n"
+            f"• Форматы: {answers.get('formats', '—')}\n"
+            f"• Тематический охват: {answers.get('niche_topics', '—')}\n"
             f"• Цели: {answers.get('s2_goals', '—')}\n"
+            f"• Сигнатурные темы: {answers.get('signature_themes', '—')}\n"
+            f"• Личный угол: {answers.get('personal_angle', '—')}\n"
+            f"• Human Design: {answers.get('human_design', '—')}\n"
+            f"• Ритм: {answers.get('cadence', '—')}\n"
             f"• Что должен почувствовать читатель: {answers.get('s2_reader_feel', '—')}\n"
             f"• Что не публикуете: {answers.get('s2_avoid_topics', '—')}\n"
             f"• Анти-маркеры: {answers.get('s2_anti_markers', '—')}"
@@ -244,9 +299,17 @@ def build_s2_summary(answers: dict[str, str], lang: str) -> str:
     return (
         "PROFILE CARD\n"
         f"• Who you are: {answers.get('s2_about', '—')}\n"
+        f"• Occupation: {answers.get('occupation', '—')}\n"
         f"• Audience: {answers.get('s2_audience', '—')}\n"
         f"• Platforms: {answers.get('s2_platforms', '—')}\n"
+        f"• Tone: {answers.get('voice_tone', '—')}\n"
+        f"• Formats: {answers.get('formats', '—')}\n"
+        f"• Topic scope: {answers.get('niche_topics', '—')}\n"
         f"• Goals: {answers.get('s2_goals', '—')}\n"
+        f"• Signature themes: {answers.get('signature_themes', '—')}\n"
+        f"• Personal angle: {answers.get('personal_angle', '—')}\n"
+        f"• Human Design: {answers.get('human_design', '—')}\n"
+        f"• Cadence: {answers.get('cadence', '—')}\n"
         f"• Reader should feel: {answers.get('s2_reader_feel', '—')}\n"
         f"• Topics to avoid: {answers.get('s2_avoid_topics', '—')}\n"
         f"• Anti-markers: {answers.get('s2_anti_markers', '—')}"
@@ -292,26 +355,71 @@ def build_system_prompt(
     tribal_block: str,
     lang: str,
 ) -> str:
+    examples_raw = answers.get("s3_samples", "")
+    examples: list[str] = []
+    if examples_raw:
+        try:
+            parsed = json.loads(examples_raw)
+            if isinstance(parsed, list):
+                examples = [str(chunk).strip() for chunk in parsed if str(chunk).strip()][:3]
+        except Exception:
+            examples = [chunk.strip() for chunk in examples_raw.split("\n\n") if chunk.strip()][:3]
+    examples_block = "\n".join(f"- {item}" for item in examples) if examples else "- n/a"
+    banned_topics = answers.get("s4_boundaries", "—")
+    anti_markers = answers.get("s2_anti_markers", "—")
+    reader_phrase = answers.get("s5_reader_phrase", "—")
+    content_goal = answers.get("s2_goals", "—")
+    tribal_goal = answers.get("s5_reader_phrase", "—")
+
     if lang == "ru":
         return (
             "Ты — мой ИИ-помощник по контенту. Ты пишешь от моего имени,\n"
             "для моей аудитории, в моём голосе. Не как робот — как я.\n\n"
             "# КТО Я\n"
-            f"{answers.get('s2_about', '—')}\n\n"
+            f"{answers.get('s2_about', '—')}\n"
+            f"Цели: {content_goal}\n\n"
             "# МОЯ АУДИТОРИЯ\n"
             f"{answers.get('s2_audience', '—')}\n\n"
             "# ПЛАТФОРМЫ\n"
             f"{answers.get('s2_platforms', '—')}\n\n"
             "# ЦЕЛЬ КОНТЕНТА\n"
-            f"{answers.get('s2_goals', '—')}\n\n"
+            f"{content_goal}\n"
+            f"Tribal phrase: {tribal_goal}\n\n"
             "# МОЙ ГОЛОС\n"
             f"{style_card}\n\n"
             "# МОИ ЦЕННОСТИ И ПРОТИВОРЕЧИЯ\n"
             f"{values_block}\n\n"
             "# ЭМОЦИОНАЛЬНЫЙ ОТПЕЧАТОК\n"
-            f"{answers.get('s2_reader_feel', '—')}\n\n"
+            f"{reader_phrase}\n\n"
+            "# ФОРМАТЫ ПОСТОВ КОТОРЫЕ Я ИСПОЛЬЗУЮ\n"
+            "1. История + вывод\n"
+            "2. Конфликт / противоречие\n"
+            "3. Практика / инструмент\n"
+            "4. Рефлексия\n\n"
+            "# ПРАВИЛА ПИСЬМА (на основе моего стиля)\n"
+            "- Личное местоимение \"я\", не \"автор\".\n"
+            "- Чередуй короткие и длинные предложения.\n"
+            "- Соло-предложение как абзац - для акцента.\n"
+            "- Финал - мысль или вопрос, не прямой CTA.\n"
+            "- Самоирония без самобичевания.\n"
+            "- Признавай противоречия там, где они есть.\n\n"
             "# АНТИ-МАРКЕРЫ — ЧТО НИКОГДА НЕ ПИСАТЬ\n"
-            f"{answers.get('s2_anti_markers', '—')}\n\n"
+            f"{anti_markers}\n"
+            "Запрещённые конструкции:\n"
+            "- важно отметить, следует учитывать, в заключение\n"
+            "- это не X - это Y как драматическая концовка\n"
+            "- будущее за теми кто... без личного угла\n"
+            "- пустые слоганы и списки без истории\n"
+            f"Запрещённые темы: {banned_topics}\n\n"
+            "# QUALITY GATE — ВНУТРЕННИЙ ЧЕК ПЕРЕД ВЫДАЧЕЙ\n"
+            "1. Generic detector: убирай AI-фразы и шаблонные контрасты.\n"
+            "2. Rhythm: разрывай ритм, если 3+ фразы одной длины подряд.\n"
+            "3. Specificity: добавляй личное я, число/дату/имя или конкретный факт.\n"
+            "4. Anti-slop: удаляй пустые слоганы и псевдо-умные формулы.\n\n"
+            "# TRIBAL CHECK — ФИНАЛЬНЫЙ ВОПРОС ПЕРЕД ВЫДАЧЕЙ\n"
+            f"\"{reader_phrase}\" - попадает ли пост в это?\n\n"
+            "# ПРИМЕРЫ МОИХ ПОСТОВ (для калибровки тона)\n"
+            f"{examples_block}\n\n"
             "# ФИНАЛЬНАЯ ПРОВЕРКА ПЕРЕД ВЫДАЧЕЙ\n"
             f"{tribal_block}\n"
         )
@@ -325,22 +433,50 @@ def build_system_prompt(
         "# PLATFORMS\n"
         f"{answers.get('s2_platforms', '—')}\n\n"
         "# CONTENT GOAL\n"
-        f"{answers.get('s2_goals', '—')}\n\n"
+        f"{content_goal}\n"
+        f"Tribal phrase: {tribal_goal}\n\n"
         "# MY VOICE\n"
         f"{style_card}\n\n"
         "# MY VALUES AND CONTRADICTIONS\n"
         f"{values_block}\n\n"
         "# EMOTIONAL IMPRINT\n"
-        f"{answers.get('s2_reader_feel', '—')}\n\n"
+        f"{reader_phrase}\n\n"
+        "# POST FORMATS I USE\n"
+        "1. Story + takeaway\n"
+        "2. Conflict / contradiction\n"
+        "3. Practical tool\n"
+        "4. Reflection\n\n"
+        "# WRITING RULES (from my style)\n"
+        "- Use first person \"I\".\n"
+        "- Alternate short and long sentences.\n"
+        "- Use solo-sentence paragraph for emphasis.\n"
+        "- End with thought or question, not hard CTA.\n"
+        "- Keep self-irony without self-destruction.\n"
+        "- Admit contradictions when real.\n\n"
         "# ANTI-MARKERS - NEVER WRITE\n"
-        f"{answers.get('s2_anti_markers', '—')}\n\n"
+        f"{anti_markers}\n"
+        "Forbidden constructions:\n"
+        "- it is important to note / in conclusion / should be considered\n"
+        "- this is not X, this is Y dramatic closer\n"
+        "- the future belongs to those who... without personal angle\n"
+        "- empty slogans and listicles without story\n"
+        f"Forbidden topics: {banned_topics}\n\n"
+        "# QUALITY GATE - INTERNAL CHECK\n"
+        "1. Generic detector: remove AI filler phrases.\n"
+        "2. Rhythm: break 3+ same-length sentence streaks.\n"
+        "3. Specificity: include first-person + concrete detail.\n"
+        "4. Anti-slop: remove empty slogan patterns.\n\n"
+        "# TRIBAL CHECK - FINAL QUESTION\n"
+        f"\"{reader_phrase}\" - does this post hit it?\n\n"
+        "# EXAMPLES OF MY POSTS (tone calibration)\n"
+        f"{examples_block}\n\n"
         "# FINAL CHECK BEFORE OUTPUT\n"
         f"{tribal_block}\n"
     )
 
 
 def extract_first_url(text: str) -> str | None:
-    match = re.search(r"https?://\\S+", text)
+    match = re.search(r"https?://\S+", text)
     if not match:
         return None
     return match.group(0).rstrip(").,!?")

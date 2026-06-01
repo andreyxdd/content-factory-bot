@@ -9,11 +9,20 @@ def test_required_answers_include_toggles() -> None:
     assert "s2_avoid_topics" in required
     assert "s2_anti_markers" in required
     assert "s5_voice_betrayal" in required
-    assert "web_research" not in required
-    assert "review_agent" not in required
+    assert "web_research" in required
+    assert "review_agent" in required
+    assert "occupation" in required
+    assert "voice_tone" in required
+    assert "formats" in required
+    assert "niche_topics" in required
+    assert "hard_limits" in required
+    assert "signature_themes" in required
+    assert "personal_angle" in required
+    assert "human_design" in required
+    assert "cadence" in required
 
 
 def test_ordered_profile_keys_stable() -> None:
     keys = ordered_profile_keys()
-    assert keys[0] == "s2_about"
+    assert keys[0] == "primary_language"
     assert keys[-1] == "review_agent"

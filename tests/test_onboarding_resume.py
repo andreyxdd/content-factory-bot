@@ -14,18 +14,29 @@ def test_resume_step_from_answers_picks_first_missing_key() -> None:
             "s2_audience": "B",
         }
     )
-    assert step == "s2_platforms"
+    assert step == "s2_occupation"
 
 
 def test_resume_step_from_answers_goes_to_toggle_when_profile_core_filled() -> None:
     step = _resume_step_from_answers(
         {
             "s2_about": "A",
+            "occupation": "Founder",
             "s2_audience": "B",
+            "audience": "B",
             "s2_platforms": "C",
+            "voice_tone": "Direct",
+            "formats": "Short posts",
+            "niche_topics": "2-3 themes",
             "s2_goals": "a, c",
+            "content_goals": "a, c",
+            "signature_themes": "Personal stories",
+            "personal_angle": "Career arc",
+            "human_design": "No",
+            "cadence": "Few times/week",
             "s2_reader_feel": "D",
             "s2_avoid_topics": "E",
+            "hard_limits": "E",
             "s2_anti_markers": "important to note",
             "s4_beliefs": "F",
             "s4_contradictions": "G",
@@ -69,9 +80,9 @@ async def test_cmd_onboarding_resumes_from_saved_answers(mock_send_prompt: Async
         await cmd_onboarding(message, state, **{UI_LANG_KEY: "en"})
 
     update_kwargs = state.update_data.await_args.kwargs
-    assert update_kwargs["current_step"] == "s2_platforms"
+    assert update_kwargs["current_step"] == "s2_occupation"
     assert update_kwargs["answers"]["s2_about"] == "Builder"
-    mock_send_prompt.assert_awaited_once_with(message, state, "en", "s2_platforms")
+    mock_send_prompt.assert_awaited_once_with(message, state, "en", "s2_occupation")
 
 
 @pytest.mark.asyncio
@@ -97,11 +108,22 @@ async def test_cmd_onboarding_prefers_furthest_resume_step_over_stale_fsm(
             new_callable=AsyncMock,
             return_value={
                 "s2_about": "Builder",
+                "occupation": "Founder",
                 "s2_audience": "Founders",
+                "audience": "Founders",
                 "s2_platforms": "Telegram",
+                "voice_tone": "Direct",
+                "formats": "Short posts",
+                "niche_topics": "2-3 themes",
                 "s2_goals": "a,b",
+                "content_goals": "a,b",
+                "signature_themes": "Stories",
+                "personal_angle": "Career arc",
+                "human_design": "No",
+                "cadence": "Weekly",
                 "s2_reader_feel": "Relief",
                 "s2_avoid_topics": "Politics",
+                "hard_limits": "Politics",
             },
         ),
     ):
@@ -199,11 +221,22 @@ async def test_cmd_onboarding_resume_s6_confirm_does_not_crash() -> None:
 
     all_answers = {
         "s2_about": "A",
+        "occupation": "Founder",
         "s2_audience": "B",
+        "audience": "B",
         "s2_platforms": "C",
+        "voice_tone": "Direct",
+        "formats": "Short posts",
+        "niche_topics": "2-3 themes",
         "s2_goals": "a,b",
+        "content_goals": "a,b",
+        "signature_themes": "Stories",
+        "personal_angle": "Career arc",
+        "human_design": "No",
+        "cadence": "Weekly",
         "s2_reader_feel": "D",
         "s2_avoid_topics": "E",
+        "hard_limits": "E",
         "s2_anti_markers": "important to note",
         "s4_beliefs": "F",
         "s4_contradictions": "G",

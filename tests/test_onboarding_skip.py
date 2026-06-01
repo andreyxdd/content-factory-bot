@@ -29,10 +29,10 @@ async def test_skip_optional_step_advances(
 
     mock_persist_answer.assert_awaited_once_with(100, "s2_platforms", "", None)
     assert any(
-        call.kwargs.get("current_step") == "s2_goals"
+        call.kwargs.get("current_step") == "s2_voice_tone"
         for call in state.update_data.await_args_list
     )
-    mock_send_prompt.assert_awaited_once_with(callback.message, state, "en", "s2_goals")
+    mock_send_prompt.assert_awaited_once_with(callback.message, state, "en", "s2_voice_tone")
 
 
 @pytest.mark.asyncio
@@ -67,7 +67,7 @@ async def test_skip_toggle_research_does_not_persist_and_moves_to_review(
 
     await on_onboarding_callback(callback, state, **{UI_LANG_KEY: "en"})
 
-    mock_persist_answer.assert_not_awaited()
+    mock_persist_answer.assert_awaited_once_with(102, "web_research", "Yes", 0)
     assert any(
         call.kwargs.get("current_step") == "toggle_review"
         for call in state.update_data.await_args_list
