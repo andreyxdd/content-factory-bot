@@ -14,7 +14,7 @@ from content_factory_bot.services.content_session import (
     list_recent_sessions,
 )
 from content_factory_bot.services.creators import ensure_creator
-from content_factory_bot.services.profile import is_profile_ready
+from content_factory_bot.services.profile import get_profile_answers_map, is_profile_ready
 
 router = Router(name="common")
 
@@ -29,6 +29,25 @@ def _start_first_time_keyboard(lang: str) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text=f"🚀 {t('start_btn_onboarding', lang)}",
+                    callback_data="start:onboarding",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=f"🌐 {_language_button_label(lang)}",
+                    callback_data="start:settings",
+                )
+            ],
+        ]
+    )
+
+
+def _start_partial_keyboard(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=f"🚀 {t('start_btn_resume_onboarding', lang)}",
                     callback_data="start:onboarding",
                 )
             ],
@@ -114,7 +133,10 @@ def _lang(message: Message, data: dict) -> str:
 async def _start_message_payload(uid: int, lang: str) -> tuple[str, InlineKeyboardMarkup]:
     async with session_scope() as session:
         ready = await is_profile_ready(session, uid)
+        answers = await get_profile_answers_map(session, uid)
     if not ready:
+        if answers:
+            return t("start_resume_onboarding", lang), _start_partial_keyboard(lang)
         return t("start_need_onboarding", lang), _start_first_time_keyboard(lang)
     detected = t("locale_detected_ru", lang) if lang == "ru" else t("locale_detected_en", lang)
     hint = t("start_body", lang)
@@ -131,7 +153,7 @@ async def _set_creator_language(uid: int, lang: str) -> None:
 
 
 @router.message(Command("start"))
-async def cmd_start(message: Message, **data) -> None:
+async def cmd_start(message: Message, state: FSMContext, **data) -> None:
     if not message.from_user:
         return
     lang = _lang(message, data)
@@ -143,6 +165,15 @@ async def cmd_start(message: Message, **data) -> None:
             telegram_user_id=uid,
             language_code=message.from_user.language_code,
         )
+    # Prefer explicit resume UX if onboarding has in-flight FSM step
+    # even before answers were persisted.
+    fsm_data = await state.get_data()
+    if fsm_data.get("current_step"):
+        await message.answer(
+            t("start_resume_onboarding", lang),
+            reply_markup=_start_partial_keyboard(lang),
+        )
+        return
     text, kb = await _start_message_payload(uid, lang)
     await message.answer(text, reply_markup=kb)
 

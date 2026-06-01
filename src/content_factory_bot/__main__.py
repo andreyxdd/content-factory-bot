@@ -4,7 +4,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.redis import RedisStorage
 
 from content_factory_bot.config import get_settings
 from content_factory_bot.db.schema import ensure_schema
@@ -33,7 +33,7 @@ async def main() -> None:
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-    dp = Dispatcher(storage=MemoryStorage())
+    dp = Dispatcher(storage=RedisStorage.from_url(settings.redis_url))
     dp.message.middleware(LocaleMiddleware())
     dp.callback_query.middleware(LocaleMiddleware())
     dp.message.middleware(AllowlistMiddleware())
