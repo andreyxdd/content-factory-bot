@@ -396,7 +396,7 @@ async def _return_to_confirm(message: Message, state: FSMContext, lang: str, con
         tribal = build_tribal_block(answers, lang)
         updates["values_block_text"] = values
         updates["tribal_block_text"] = tribal
-        updates["system_prompt_text"] = build_system_prompt(answers, style, values, tribal)
+        updates["system_prompt_text"] = build_system_prompt(answers, style, values, tribal, lang)
     await state.update_data(**updates)
     await _show_confirm_blocks(message, state, confirm_step, lang)
 
@@ -710,7 +710,7 @@ async def on_onboarding_callback(callback: CallbackQuery, state: FSMContext, **d
                 style = fsm.get("style_card_text", build_style_card([], lang))
                 values = fsm.get("values_block_text", build_values_block(answers, lang))
                 tribal = build_tribal_block(answers, lang)
-                system_prompt = build_system_prompt(answers, style, values, tribal)
+                system_prompt = build_system_prompt(answers, style, values, tribal, lang)
                 await state.update_data(
                     tribal_block_text=tribal,
                     system_prompt_text=system_prompt,
@@ -932,7 +932,7 @@ async def on_onboarding_text(message: Message, state: FSMContext, **data) -> Non
             style = fsm.get("style_card_text", build_style_card([], lang))
             values = fsm.get("values_block_text", build_values_block(answers, lang))
             tribal = build_tribal_block(answers, lang)
-            system_prompt = build_system_prompt(answers, style, values, tribal)
+            system_prompt = build_system_prompt(answers, style, values, tribal, lang)
             await state.update_data(
                 tribal_block_text=tribal,
                 system_prompt_text=system_prompt,

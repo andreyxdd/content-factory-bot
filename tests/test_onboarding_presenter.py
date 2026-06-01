@@ -1,3 +1,5 @@
+import re
+
 from content_factory_bot.services.onboarding_engine import (
     build_s2_summary,
     build_style_card,
@@ -32,7 +34,29 @@ def test_build_system_prompt_includes_tribal_and_values() -> None:
     answers = {"s2_about": "I am a creator", "s2_audience": "Founders", "s2_platforms": "Telegram"}
     values = build_values_block({"s4_beliefs": "Slow is smooth"}, "en")
     tribal = build_tribal_block({"s5_reader_phrase": "I should try this"}, "en")
-    prompt = build_system_prompt(answers, "STYLE", values, tribal)
+    prompt = build_system_prompt(answers, "STYLE", values, tribal, "en")
     assert "I am a creator" in prompt
     assert "STYLE" in prompt
-    assert "TRIBAL CHECK" in prompt
+    assert "FINAL CHECK BEFORE OUTPUT" in prompt
+
+
+def test_en_style_card_has_no_cyrillic_antimarkers() -> None:
+    text = build_style_card(["I ship fast and iterate weekly."], "en")
+    assert re.search(r"[А-Яа-яЁё]", text) is None
+    assert "important to note" in text or "in conclusion" in text
+
+
+def test_ru_style_card_and_prompt_have_no_english_template_headers() -> None:
+    style = build_style_card(["Я пишу коротко и без воды."], "ru")
+    assert "Person:" not in style
+    assert "Self-disclosure" not in style
+    assert "important to note" not in style
+    prompt = build_system_prompt(
+        {"s2_about": "Я автор", "s2_audience": "Фаундеры", "s2_platforms": "Телеграм"},
+        style,
+        build_values_block({"s4_beliefs": "Простота лучше шума"}, "ru"),
+        build_tribal_block({"s5_reader_phrase": "Это про меня"}, "ru"),
+        "ru",
+    )
+    assert "# КТО Я" in prompt
+    assert "# WHO I AM" not in prompt

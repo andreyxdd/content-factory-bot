@@ -101,10 +101,10 @@ def _guess_person(samples: list[str], lang: str) -> str:
     first = text.count(" я ") + text.count(" i ")
     second = text.count(" ты ") + text.count(" you ")
     if first > second:
-        return "1st person (я/I)"
+        return "1-е лицо (я)" if lang == "ru" else "1st person (I)"
     if second > first:
-        return "2nd person (ты/you)"
-    return "Mixed"
+        return "2-е лицо (ты)" if lang == "ru" else "2nd person (you)"
+    return "Смешанный" if lang == "ru" else "Mixed"
 
 
 def build_style_card(samples: list[str], lang: str) -> str:
@@ -112,8 +112,8 @@ def build_style_card(samples: list[str], lang: str) -> str:
         if lang == "ru":
             return (
                 "ГОЛОС\n"
-                "  • Person: не задано (нет образцов)\n"
-                "  • Self-disclosure: не задано\n"
+                "  • Лицо: не задано (нет образцов)\n"
+                "  • Самораскрытие: не задано\n"
                 "  • Самоирония: не задано\n"
                 "  • Противоречия: не задано\n\n"
                 "ФОРМАТЫ\n"
@@ -121,12 +121,12 @@ def build_style_card(samples: list[str], lang: str) -> str:
                 "  • Длина: не определена\n"
                 "  • Финал: не определен\n\n"
                 "РИТМ\n"
-                "  • Burstiness: не определен\n"
+                "  • Динамичность: не определена\n"
                 "  • Соло-абзац как акцент: не определен\n\n"
                 "ЛЕКСИКА\n"
                 "  • Регистр: не определен\n"
                 "  • Мат: не определен\n"
-                "  • EN-термины: не определены\n"
+                "  • Англоязычные термины: не определены\n"
                 "  • Личные триггеры: не выделены\n"
                 "  • Пунктуация: не определена\n\n"
                 "АНТИ-МАРКЕРЫ\n"
@@ -160,27 +160,27 @@ def build_style_card(samples: list[str], lang: str) -> str:
     person = _guess_person(samples, lang)
     total = sum(len(x) for x in samples)
     avg = total // max(len(samples), 1)
-    length = "short" if avg < 500 else "medium" if avg < 1500 else "long"
+    if lang == "ru":
+        length = "короткая" if avg < 500 else "средняя" if avg < 1500 else "длинная"
+    else:
+        length = "short" if avg < 500 else "medium" if avg < 1500 else "long"
     anti = []
     joined = " ".join(samples).lower()
-    for phrase in (
-        "важно отметить",
-        "в заключение",
-        "следует учитывать",
-        "будущее за теми",
-        "important to note",
-        "in conclusion",
-        "it is important to consider",
-    ):
+    anti_candidates = (
+        ("важно отметить", "в заключение", "следует учитывать", "будущее за теми")
+        if lang == "ru"
+        else ("important to note", "in conclusion", "it is important to consider", "the future belongs to those")
+    )
+    for phrase in anti_candidates:
         if phrase not in joined:
             anti.append(phrase)
-    anti_text = ", ".join(anti[:4]) if anti else "generic AI fillers"
+    anti_text = ", ".join(anti[:4]) if anti else ("общие ИИ-штампы" if lang == "ru" else "generic AI fillers")
 
     if lang == "ru":
         return (
             f"ГОЛОС\n"
-            f"  • Person: {person}\n"
-            f"  • Self-disclosure: средний\n"
+            f"  • Лицо: {person}\n"
+            f"  • Самораскрытие: средний уровень\n"
             f"  • Самоирония: умеренная\n"
             f"  • Противоречия: присутствуют\n\n"
             f"ФОРМАТЫ\n"
@@ -188,12 +188,12 @@ def build_style_card(samples: list[str], lang: str) -> str:
             f"  • Длина: {length}\n"
             f"  • Финал: открытый вопрос или вывод\n\n"
             f"РИТМ\n"
-            f"  • Burstiness: средний\n"
+            f"  • Динамичность: средняя\n"
             f"  • Соло-абзац как акцент: иногда\n\n"
             f"ЛЕКСИКА\n"
             f"  • Регистр: гибрид\n"
             f"  • Мат: точечно или нет\n"
-            f"  • EN-термины: по контексту ниши\n"
+            f"  • Англоязычные термины: по контексту ниши\n"
             f"  • Личные триггеры: выделить после правок\n"
             f"  • Пунктуация: тире/скобки по месту\n\n"
             f"АНТИ-МАРКЕРЫ\n"
@@ -268,7 +268,7 @@ def build_values_block(answers: dict[str, str], lang: str) -> str:
 def build_tribal_block(answers: dict[str, str], lang: str) -> str:
     if lang == "ru":
         return (
-            "TRIBAL CHECK\n"
+            "ПРОВЕРКА СВОЕГО ЧИТАТЕЛЯ\n"
             f"• Фраза идеального читателя: {answers.get('s5_reader_phrase', '—')}\n"
             f"• Предательство голоса: {answers.get('s5_voice_betrayal', '—')}"
         )
@@ -279,27 +279,56 @@ def build_tribal_block(answers: dict[str, str], lang: str) -> str:
     )
 
 
-def build_system_prompt(answers: dict[str, str], style_card: str, values_block: str, tribal_block: str) -> str:
+def build_system_prompt(
+    answers: dict[str, str],
+    style_card: str,
+    values_block: str,
+    tribal_block: str,
+    lang: str,
+) -> str:
+    if lang == "ru":
+        return (
+            "Ты — мой ИИ-помощник по контенту. Ты пишешь от моего имени,\n"
+            "для моей аудитории, в моём голосе. Не как робот — как я.\n\n"
+            "# КТО Я\n"
+            f"{answers.get('s2_about', '—')}\n\n"
+            "# МОЯ АУДИТОРИЯ\n"
+            f"{answers.get('s2_audience', '—')}\n\n"
+            "# ПЛАТФОРМЫ\n"
+            f"{answers.get('s2_platforms', '—')}\n\n"
+            "# ЦЕЛЬ КОНТЕНТА\n"
+            f"{answers.get('s2_goals', '—')}\n\n"
+            "# МОЙ ГОЛОС\n"
+            f"{style_card}\n\n"
+            "# МОИ ЦЕННОСТИ И ПРОТИВОРЕЧИЯ\n"
+            f"{values_block}\n\n"
+            "# ЭМОЦИОНАЛЬНЫЙ ОТПЕЧАТОК\n"
+            f"{answers.get('s2_reader_feel', '—')}\n\n"
+            "# АНТИ-МАРКЕРЫ — ЧТО НИКОГДА НЕ ПИСАТЬ\n"
+            f"{answers.get('s2_avoid_topics', '—')}\n\n"
+            "# ФИНАЛЬНАЯ ПРОВЕРКА ПЕРЕД ВЫДАЧЕЙ\n"
+            f"{tribal_block}\n"
+        )
     return (
-        "Ты — мой AI-помощник по контенту. Ты пишешь от моего имени,\n"
-        "для моей аудитории, в моём голосе. Не как робот — как я.\n\n"
-        "# КТО Я\n"
+        "You are my AI content copilot. Write on my behalf,\n"
+        "for my audience, in my voice. Not like a robot - like me.\n\n"
+        "# WHO I AM\n"
         f"{answers.get('s2_about', '—')}\n\n"
-        "# МОЯ АУДИТОРИЯ\n"
+        "# MY AUDIENCE\n"
         f"{answers.get('s2_audience', '—')}\n\n"
-        "# ПЛАТФОРМЫ\n"
+        "# PLATFORMS\n"
         f"{answers.get('s2_platforms', '—')}\n\n"
-        "# ЦЕЛЬ КОНТЕНТА\n"
+        "# CONTENT GOAL\n"
         f"{answers.get('s2_goals', '—')}\n\n"
-        "# МОЙ ГОЛОС (Style Markers)\n"
+        "# MY VOICE\n"
         f"{style_card}\n\n"
-        "# МОИ ЦЕННОСТИ И ПРОТИВОРЕЧИЯ\n"
+        "# MY VALUES AND CONTRADICTIONS\n"
         f"{values_block}\n\n"
-        "# ЭМОЦИОНАЛЬНЫЙ ОТПЕЧАТОК\n"
+        "# EMOTIONAL IMPRINT\n"
         f"{answers.get('s2_reader_feel', '—')}\n\n"
-        "# АНТИ-МАРКЕРЫ — ЧТО НИКОГДА НЕ ПИСАТЬ\n"
+        "# ANTI-MARKERS - NEVER WRITE\n"
         f"{answers.get('s2_avoid_topics', '—')}\n\n"
-        "# TRIBAL CHECK — ФИНАЛЬНЫЙ ВОПРОС ПЕРЕД ВЫДАЧЕЙ\n"
+        "# FINAL CHECK BEFORE OUTPUT\n"
         f"{tribal_block}\n"
     )
 
