@@ -130,6 +130,17 @@ def _help_row(lang: str) -> list[InlineKeyboardButton]:
     return [InlineKeyboardButton(text=text, callback_data="onb:nav:help")]
 
 
+def _sample_actions_kb(lang: str, *, include_skip: bool) -> InlineKeyboardMarkup:
+    analyze = "Анализировать образцы" if lang == "ru" else "Analyze samples"
+    rows: list[list[InlineKeyboardButton]] = [
+        [InlineKeyboardButton(text=analyze, callback_data="onb:sample:analyze")]
+    ]
+    if include_skip:
+        skip = "Пропустить пока" if lang == "ru" else "Skip for now"
+        rows.append([InlineKeyboardButton(text=skip, callback_data="onb:sample:skip")])
+    return _kb(rows, lang)
+
+
 def _question_text(step: str, lang: str) -> str:
     if lang == "ru":
         prompts = {
@@ -415,17 +426,9 @@ async def _send_prompt(target: Message, state: FSMContext, lang: str, step: str)
         )
         return
     if step == "s3_samples":
-        analyze = "Анализировать образцы" if lang == "ru" else "Analyze samples"
-        skip = "Пропустить пока" if lang == "ru" else "Skip for now"
         await target.answer(
             _question_text(step, lang),
-            reply_markup=_kb(
-                [
-                    [InlineKeyboardButton(text=analyze, callback_data="onb:sample:analyze")],
-                    [InlineKeyboardButton(text=skip, callback_data="onb:sample:skip")],
-                ],
-                lang,
-            ),
+            reply_markup=_sample_actions_kb(lang, include_skip=True),
         )
         return
     if step == "toggle_research":
@@ -882,7 +885,7 @@ async def on_onboarding_text(message: Message, state: FSMContext, **data) -> Non
             samples.append(text)
         await state.update_data(samples=samples)
         ack = f"Образец сохранен ({len(samples)})." if lang == "ru" else f"Sample saved ({len(samples)})."
-        await message.answer(ack)
+        await message.answer(ack, reply_markup=_sample_actions_kb(lang, include_skip=False))
         return
 
     if step == "s2_goals" and "e" in set(fsm.get("goal_selected", [])):

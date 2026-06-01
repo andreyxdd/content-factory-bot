@@ -80,3 +80,19 @@ async def test_pending_edit_returns_to_origin_confirm(
         for call in state.update_data.await_args_list
     )
     mock_show_confirm.assert_awaited_once_with(message, state, "s4_confirm", "en")
+
+
+@pytest.mark.asyncio
+async def test_s3_sample_saved_ack_includes_analyze_button() -> None:
+    message = AsyncMock()
+    message.from_user.id = 21
+    message.text = "Some sample post"
+    state = AsyncMock()
+    state.get_data = AsyncMock(return_value={"current_step": "s3_samples", "samples": []})
+
+    await on_onboarding_text(message, state, **{UI_LANG_KEY: "en"})
+
+    args, kwargs = message.answer.await_args
+    assert args[0] == "Sample saved (1)."
+    callbacks = _callback_data_set(kwargs["reply_markup"])
+    assert "onb:sample:analyze" in callbacks
