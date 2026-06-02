@@ -7,6 +7,10 @@ def setup_keyboard(
     r = "✅ " if research else ""
     c = "✅ " if cover else ""
     i = "✅ " if has_instructions else ""
+    instruction_button = InlineKeyboardButton(
+        text=f"{i}{t('session_instructions', lang)}",
+        callback_data="cs:setup:instructions",
+    )
     rows: list[list[InlineKeyboardButton]] = [
         [
             InlineKeyboardButton(
@@ -20,22 +24,19 @@ def setup_keyboard(
                 callback_data="cs:toggle:cover",
             )
         ],
-        [
-            InlineKeyboardButton(
-                text=f"{i}{t('session_instructions', lang)}",
-                callback_data="cs:setup:instructions",
-            )
-        ],
     ]
     if has_instructions:
         rows.append(
             [
+                instruction_button,
                 InlineKeyboardButton(
                     text=t("session_instructions_clear", lang),
                     callback_data="cs:setup:clear_instructions",
-                )
+                ),
             ]
         )
+    else:
+        rows.append([instruction_button])
     rows.append(
         [
             InlineKeyboardButton(

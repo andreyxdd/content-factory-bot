@@ -13,11 +13,14 @@ def test_setup_keyboard_has_start_row() -> None:
 
 def test_setup_keyboard_clear_when_instructions_set() -> None:
     kb = setup_keyboard("en", research=True, cover=False, has_instructions=True)
-    assert any(
-        btn.callback_data == "cs:setup:clear_instructions"
+    instruction_row = next(
+        row
         for row in kb.inline_keyboard
-        for btn in row
+        if any(btn.callback_data == "cs:setup:instructions" for btn in row)
     )
+    assert len(instruction_row) == 2
+    assert instruction_row[0].callback_data == "cs:setup:instructions"
+    assert instruction_row[1].callback_data == "cs:setup:clear_instructions"
 
 
 def test_finalize_keyboard_save_first() -> None:
